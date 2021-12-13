@@ -6,7 +6,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import json
 from datetime import datetime
 import socket
-from typing import Any, Optional
+from typing import Any, List, Optional
 from uuid import uuid4
 import re
 from azure.storage.blob import BlobServiceClient
@@ -89,7 +89,14 @@ class Log4PotHTTPServer(ThreadingHTTPServer):
         self.logger = logger
         super().__init__(*args, **kwargs)
 
-argparser = ArgumentParser(description="A honeypot for the Log4Shell vulnerability (CVE-2021-44228).")
+class Log4PotArgumentParser(ArgumentParser):
+    def convert_arg_line_to_args(self, arg_line: str) -> List[str]:
+        return arg_line.split()
+
+argparser = Log4PotArgumentParser(
+    description="A honeypot for the Log4Shell vulnerability (CVE-2021-44228).",
+    fromfile_prefix_chars="@",
+    )
 argparser.add_argument("--port", "-p", type=int, default=8080, help="Listening port")
 argparser.add_argument("--log", "-l", type=str, default="log4pot.log", help="Log file")
 argparser.add_argument("--blob-connection-string", "-b", help="Azure blob storage connection string.")
