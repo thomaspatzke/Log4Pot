@@ -5,18 +5,31 @@ from argparse import ArgumentParser
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import json
 from datetime import datetime
-from typing import Any
+import socket
+from typing import Any, Optional
 from uuid import uuid4
 import re
+from azure.storage.blob import BlobServiceClient
 
 re_exploit = re.compile("\${.*}")
 
 @dataclass
 class Logger:
     logfile : str
+    blob_connection_str : Optional[str]
+    log_container : Optional[str]
+    log_blob : Optional[str]
 
     def __post_init__(self):
         self.f = open(self.logfile, "a")
+        if self.blob_connection_str is not None:
+            service_client = BlobServiceClient.from_connection_string(self.blob_connection_str)
+            container = service_client.get_container_client(self.log_container)
+            blob = container.get_blob_client(self.log_blob)
+            blob.exists() or blob.create_append_blob()
+            self.blob = blob
+        else:
+            self.blob = None
 
     def log(self, logtype : str, message : str, **kwargs):
         d = {
@@ -24,8 +37,9 @@ class Logger:
             "timestamp": datetime.utcnow().isoformat(),
             **kwargs,
         }
-        j = json.dump(d, self.f)
-        self.f.write("\n")
+        j = json.dumps(d) + "\n"
+        self.f.write(j)
+        self.blob.append_block(j)
 
     def log_start(self):
         self.log("start", "Log4Pot started")
@@ -75,12 +89,16 @@ class Log4PotHTTPServer(ThreadingHTTPServer):
         self.logger = logger
         super().__init__(*args, **kwargs)
 
-argparser = ArgumentParser(description="A honeypot for the Log4Shell vulnerability (CVE-2021-44228)")
+argparser = ArgumentParser(description="A honeypot for the Log4Shell vulnerability (CVE-2021-44228).")
 argparser.add_argument("--port", "-p", type=int, default=8080, help="Listening port")
 argparser.add_argument("--log", "-l", type=str, default="log4pot.log", help="Log file")
+argparser.add_argument("--blob-connection-string", "-b", help="Azure blob storage connection string.")
+argparser.add_argument("--log-container", "-lc", default="logs", help="Azure blob container for logs.")
+argparser.add_argument("--log-blob", "-lb", default=socket.gethostname() + ".log", help="Azure blob for logs.")
+
 args = argparser.parse_args()
 
-logger = Logger(args.log)
+logger = Logger(args.log, args.blob_connection_string, args.log_container, args.log_blob)
 server = Log4PotHTTPServer(logger, ("", args.port), Log4PotHTTPRequestHandler)
 logger.log_start()
 
