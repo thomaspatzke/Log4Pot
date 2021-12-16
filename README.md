@@ -2,6 +2,8 @@
 
 A honeypot for the Log4Shell vulnerability (CVE-2021-44228).
 
+License: [GPLv3.0](https://www.gnu.org/licenses/gpl-3.0.html)
+
 ## Features
 
 * Listen on various ports for Log4Shell exploitation.
