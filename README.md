@@ -17,6 +17,12 @@ A honeypot for the Log4Shell vulnerability (CVE-2021-44228).
 5. Put parameters into log4pot.conf.
 6. Run: `poetry run python log4pot.py @log4pot.conf`
 
+Alternatively, you can also run log4pot without external dependencies:
+```
+$ python log4pot.py @log4pot.conf
+```
+This will run log4pot without support for logging to Azure blob storage.
+
 ## Analyzing Logs with JQ
 
 List payloads from exploitation attempts:

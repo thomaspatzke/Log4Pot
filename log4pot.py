@@ -1,5 +1,6 @@
 # A honeypot for the Log4Shell vulnerability (CVE-2021-44228)
 
+import sys
 from dataclasses import dataclass
 from argparse import ArgumentParser
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -9,8 +10,15 @@ import socket
 from typing import Any, List, Optional
 from uuid import uuid4
 import re
-from azure.storage.blob import BlobServiceClient
 from threading import Thread
+
+try:
+    from azure.storage.blob import BlobServiceClient
+except ImportError:
+    print(
+        "Azure dependencies not installed, logging to blob storage not available.",
+        file=sys.stderr
+    )
 
 re_exploit = re.compile("\${.*}")
 
@@ -23,7 +31,7 @@ class Logger:
 
     def __post_init__(self):
         self.f = open(self.logfile, "a")
-        if self.blob_connection_str is not None:
+        if self.blob_connection_str is not None and 'azure.storage.blob' in sys.modules:
             service_client = BlobServiceClient.from_connection_string(self.blob_connection_str)
             container = service_client.get_container_client(self.log_container)
             blob = container.get_blob_client(self.log_blob)
