@@ -65,6 +65,9 @@ class Logger:
 
 class Log4PotHTTPRequestHandler(BaseHTTPRequestHandler):
     def do(self):
+        # If a custom server header is set, overwrite the version_string() function
+        if self.server.server_header:
+            self.version_string = lambda: self.server.server_header
         self.uuid = uuid4()
         self.send_response(200)
         self.send_header("Content-Type", "text/json")
@@ -90,12 +93,13 @@ class Log4PotHTTPRequestHandler(BaseHTTPRequestHandler):
 class Log4PotHTTPServer(ThreadingHTTPServer):
     def __init__(self, logger : Logger, *args, **kwargs):
         self.logger = logger
+        self.server_header = kwargs.pop("server_header", None)
         super().__init__(*args, **kwargs)
 
 class Log4PotServerThread(Thread):
     def __init__(self, logger : Logger, port : int, *args, **kwargs):
         self.port = port
-        self.server = Log4PotHTTPServer(logger, ("", port), Log4PotHTTPRequestHandler)
+        self.server = Log4PotHTTPServer(logger, ("", port), Log4PotHTTPRequestHandler, server_header=kwargs.pop("server_header", None))
         super().__init__(name=f"httpserver-{port}", *args, **kwargs)
 
     def run(self):
@@ -120,12 +124,13 @@ argparser.add_argument("--log", "-l", type=str, default="log4pot.log", help="Log
 argparser.add_argument("--blob-connection-string", "-b", help="Azure blob storage connection string.")
 argparser.add_argument("--log-container", "-lc", default="logs", help="Azure blob container for logs.")
 argparser.add_argument("--log-blob", "-lb", default=socket.gethostname() + ".log", help="Azure blob for logs.")
+argparser.add_argument("--server-header", type=str, default=None, help="Replace the default server header.")
 
 args = argparser.parse_args()
 
 logger = Logger(args.log, args.blob_connection_string, args.log_container, args.log_blob)
 threads  = [
-    Log4PotServerThread(logger, port)
+    Log4PotServerThread(logger, port, server_header=args.server_header)
     for port in args.port
 ]
 logger.log_start()
