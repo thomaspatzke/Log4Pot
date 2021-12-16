@@ -1,1 +1,2 @@
 --blob-connection-string <Azure storage connection string as provided in UI>
+--server-header "Apache-Coyote/1.1"
