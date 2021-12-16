@@ -41,7 +41,8 @@ class Logger:
         j = json.dumps(d) + "\n"
         self.f.write(j)
         self.f.flush()
-        self.blob.append_block(j)
+        if self.blob is not None:
+            self.blob.append_block(j)
 
     def log_start(self):
         self.log("start", "Log4Pot started")
