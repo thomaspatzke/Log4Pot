@@ -11,9 +11,11 @@ A honeypot for the Log4Shell vulnerability (CVE-2021-44228).
 ## Usage
 
 1. Install Poetry: `curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python3 -`
-2. Install dependencies: `poetry install`
-3. Put parameters into log4pot.conf.
-4. Run: `poetry run python log4pot.py @log4pot.conf`
+2. Fetch this GitHub repository `git clone https://github.com/thomaspatzke/Log4Pot.git`
+3. Change directory into the local copy with `cd Log4Pot`
+4. Install dependencies: `poetry install`
+5. Put parameters into log4pot.conf.
+6. Run: `poetry run python log4pot.py @log4pot.conf`
 
 ## Analyzing Logs with JQ
 
