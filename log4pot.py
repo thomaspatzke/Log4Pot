@@ -127,7 +127,7 @@ argparser = Log4PotArgumentParser(
     description="A honeypot for the Log4Shell vulnerability (CVE-2021-44228).",
     fromfile_prefix_chars="@",
     )
-argparser.add_argument("--port", "-p", nargs="*", type=int, default=[80, 8000, 8008, 8080, 8081, 8983, 9200], help="Listening port")
+argparser.add_argument("--port", "-p", action="append", type=int, help="Listening port")
 argparser.add_argument("--log", "-l", type=str, default="log4pot.log", help="Log file")
 argparser.add_argument("--blob-connection-string", "-b", help="Azure blob storage connection string.")
 argparser.add_argument("--log-container", "-lc", default="logs", help="Azure blob container for logs.")
@@ -135,6 +135,9 @@ argparser.add_argument("--log-blob", "-lb", default=socket.gethostname() + ".log
 argparser.add_argument("--server-header", type=str, default=None, help="Replace the default server header.")
 
 args = argparser.parse_args()
+if args.port is None:
+    print("No port specified!", file=sys.stderr)
+    sys.exit(1)
 
 logger = Logger(args.log, args.blob_connection_string, args.log_container, args.log_blob)
 threads  = [
