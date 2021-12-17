@@ -108,7 +108,12 @@ class Log4PotHTTPRequestHandler(BaseHTTPRequestHandler):
 
             if self.server.download_payloads:
                 try:
-                    data = process_payloads(parse(m.group(0)), str(self.uuid), self.server.download_dir)
+                    data = process_payloads(
+                        parse(m.group(0)),
+                        str(self.uuid),
+                        self.server.download_dir,
+                        self.server.download_class
+                    )
                     self.logger.log_payload(self.uuid, **data)
                 except Exception as e:
                     self.logger.log_exception(e)
@@ -126,6 +131,7 @@ class Log4PotHTTPServer(ThreadingHTTPServer):
         self.server_header = kwargs.pop("server_header", None)
         self.download_payloads = kwargs.pop("download_payloads", False),
         self.download_dir = kwargs.pop("download_dir", None)
+        self.download_class = kwargs.pop("download_class", None)
         super().__init__(*args, **kwargs)
 
 
@@ -138,7 +144,8 @@ class Log4PotServerThread(Thread):
             Log4PotHTTPRequestHandler,
             server_header=kwargs.pop("server_header", None),
             download_payloads=kwargs.pop("download_payloads", False),
-            download_dir=kwargs.pop("download_dir", None)
+            download_dir=kwargs.pop("download_dir", None),
+            download_class=kwargs.pop("download_class", None)
         )
         super().__init__(name=f"httpserver-{port}", *args, **kwargs)
 
@@ -169,6 +176,8 @@ argparser.add_argument("--log-blob", "-lb", default=socket.gethostname() + ".log
 argparser.add_argument("--server-header", type=str, default=None, help="Replace the default server header.")
 argparser.add_argument("--download-payloads", action="store_true", default=False,
                        help="Download http(s) and ldap payloads and log indicators.")
+argparser.add_argument("--download-class", action="store_true", default=False,
+                       help="Implement downloading Java Class file referenced by the payload..")
 argparser.add_argument("--download-dir", type=str, help="Set a download directory. If given, payloads are stored "
                                                         "persistently and are not deleted after analysis.")
 
@@ -183,7 +192,7 @@ if not azure_import and args.blob_connection_string is not None:
 logger = Logger(args.log, args.blob_connection_string, args.log_container, args.log_blob)
 threads = [
     Log4PotServerThread(logger, port, server_header=args.server_header, download_payloads=args.download_payloads,
-                        download_dir=args.download_dir)
+                        download_dir=args.download_dir, download_class=args.download_class)
     for port in args.port
 ]
 logger.log_start()

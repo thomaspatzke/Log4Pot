@@ -20,7 +20,8 @@ from urllib3.util.url import parse_url
 def process_payloads(
         parsed_jndi_string: str,
         uuid: str,
-        download_dir: Optional[str] = None
+        download_dir: Optional[str] = None,
+        download_class: Optional[bool] = False
 ):
     if not pycurl_available:
         raise ImportError("Was not able to import pycurl correctly.")
@@ -42,6 +43,13 @@ def process_payloads(
         data["filepath"] = str(new_path)
     else:
         os.remove(str(filepath))
+
+    if download_dir and download_class and "javaCodeBase" in data and "javaFactory" in data:
+        url = data["javaCodeBase"] + data["javaFactory"] + ".class"
+        temp_path = load_file(url)
+        new_path = download_dir.joinpath(uuid + ".class.dat")
+        shutil.move(temp_path, new_path)
+        data["class_filepath"] = str(new_path)
     return data
 
 
@@ -65,6 +73,7 @@ def load_file(url: str) -> Union[str, None]:
         curl.setopt(pycurl.FOLLOWLOCATION, True)
         curl.setopt(pycurl.USERAGENT, "Java/17.0.1")
         curl.setopt(pycurl.WRITEDATA, handle)
+        curl.setopt(pycurl.TIMEOUT, 3)
         curl.perform()
         status_code = curl.getinfo(pycurl.RESPONSE_CODE)
         curl.close()
