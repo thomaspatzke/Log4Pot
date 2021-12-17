@@ -175,9 +175,9 @@ argparser.add_argument("--log-container", "-lc", default="logs", help="Azure blo
 argparser.add_argument("--log-blob", "-lb", default=socket.gethostname() + ".log", help="Azure blob for logs.")
 argparser.add_argument("--server-header", type=str, default=None, help="Replace the default server header.")
 argparser.add_argument("--download-payloads", action="store_true", default=False,
-                       help="Download http(s) and ldap payloads and log indicators.")
+                       help="[EXPERIMENTAL] Download http(s) and ldap payloads and log indicators.")
 argparser.add_argument("--download-class", action="store_true", default=False,
-                       help="Implement downloading Java Class file referenced by the payload..")
+                       help="[EXPERIMENTAL] Implement downloading Java Class file referenced by the payload..")
 argparser.add_argument("--download-dir", type=str, help="Set a download directory. If given, payloads are stored "
                                                         "persistently and are not deleted after analysis.")
 
