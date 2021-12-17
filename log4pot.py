@@ -14,11 +14,13 @@ from threading import Thread
 
 try:
     from azure.storage.blob import BlobServiceClient
+    azure_import = True
 except ImportError:
     print(
         "Azure dependencies not installed, logging to blob storage not available.",
         file=sys.stderr
     )
+    azure_import = False
 
 re_exploit = re.compile("\${.*}")
 
@@ -138,6 +140,9 @@ args = argparser.parse_args()
 if args.port is None:
     print("No port specified!", file=sys.stderr)
     sys.exit(1)
+if not azure_import and args.blob_connection_string is not None:
+    print("Azure logging requested but no dependency installed!")
+    sys.exit(2)
 
 logger = Logger(args.log, args.blob_connection_string, args.log_container, args.log_blob)
 threads  = [
