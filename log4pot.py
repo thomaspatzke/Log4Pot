@@ -12,6 +12,8 @@ from threading import Thread
 from typing import Any, List, Optional
 from uuid import uuid4
 
+from expression_parser import parse
+
 try:
     from azure.storage.blob import BlobServiceClient
 except ImportError:
@@ -61,7 +63,8 @@ class Logger:
                  port=port, request=request, headers=dict(headers))
 
     def log_exploit(self, location, payload, uuid):
-        self.log("exploit", "Exploit detected", correlation_id=str(uuid), location=location, payload=payload)
+        self.log("exploit", "Exploit detected", correlation_id=str(uuid), location=location, payload=payload,
+                 deobfuscated_payload=parse(payload))
 
     def log_exception(self, e: Exception):
         self.log("exception", "Exception occurred", exception=str(e))
