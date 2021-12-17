@@ -13,9 +13,11 @@ from typing import Any, List, Optional
 from uuid import uuid4
 
 from expression_parser import parse
+from payloader import process_payloads
 
 try:
     from azure.storage.blob import BlobServiceClient
+
     azure_import = True
 except ImportError:
     print(
@@ -68,6 +70,9 @@ class Logger:
         self.log("exploit", "Exploit detected", correlation_id=str(uuid), location=location, payload=payload,
                  deobfuscated_payload=parse(payload))
 
+    def log_payload(self, uuid, **kwargs):
+        self.log("payload", "Payload downloaded", correlation_id=str(uuid), **kwargs)
+
     def log_exception(self, e: Exception):
         self.log("exception", "Exception occurred", exception=str(e))
 
@@ -101,6 +106,13 @@ class Log4PotHTTPRequestHandler(BaseHTTPRequestHandler):
         if (m := re_exploit.search(content)):
             logger.log_exploit(location, m.group(0), self.uuid)
 
+            if self.server.download_payloads:
+                try:
+                    data = process_payloads(parse(m.group(0)), str(self.uuid), self.server.download_dir)
+                    self.logger.log_payload(self.uuid, **data)
+                except Exception as e:
+                    self.logger.log_exception(e)
+
     def __getattribute__(self, __name: str) -> Any:
         if __name.startswith("do_"):
             return self.do
@@ -112,14 +124,22 @@ class Log4PotHTTPServer(ThreadingHTTPServer):
     def __init__(self, logger: Logger, *args, **kwargs):
         self.logger = logger
         self.server_header = kwargs.pop("server_header", None)
+        self.download_payloads = kwargs.pop("download_payloads", False),
+        self.download_dir = kwargs.pop("download_dir", None)
         super().__init__(*args, **kwargs)
 
 
 class Log4PotServerThread(Thread):
     def __init__(self, logger: Logger, port: int, *args, **kwargs):
         self.port = port
-        self.server = Log4PotHTTPServer(logger, ("", port), Log4PotHTTPRequestHandler,
-                                        server_header=kwargs.pop("server_header", None))
+        self.server = Log4PotHTTPServer(
+            logger,
+            ("", port),
+            Log4PotHTTPRequestHandler,
+            server_header=kwargs.pop("server_header", None),
+            download_payloads=kwargs.pop("download_payloads", False),
+            download_dir=kwargs.pop("download_dir", None)
+        )
         super().__init__(name=f"httpserver-{port}", *args, **kwargs)
 
     def run(self):
@@ -140,13 +160,17 @@ class Log4PotArgumentParser(ArgumentParser):
 argparser = Log4PotArgumentParser(
     description="A honeypot for the Log4Shell vulnerability (CVE-2021-44228).",
     fromfile_prefix_chars="@",
-    )
+)
 argparser.add_argument("--port", "-p", action="append", type=int, help="Listening port")
 argparser.add_argument("--log", "-l", type=str, default="log4pot.log", help="Log file")
 argparser.add_argument("--blob-connection-string", "-b", help="Azure blob storage connection string.")
 argparser.add_argument("--log-container", "-lc", default="logs", help="Azure blob container for logs.")
 argparser.add_argument("--log-blob", "-lb", default=socket.gethostname() + ".log", help="Azure blob for logs.")
 argparser.add_argument("--server-header", type=str, default=None, help="Replace the default server header.")
+argparser.add_argument("--download-payloads", action="store_true", default=False,
+                       help="Download http(s) and ldap payloads and log indicators.")
+argparser.add_argument("--download-dir", type=str, help="Set a download directory. If given, payloads are stored "
+                                                        "persistently and are not deleted after analysis.")
 
 args = argparser.parse_args()
 if args.port is None:
@@ -158,7 +182,8 @@ if not azure_import and args.blob_connection_string is not None:
 
 logger = Logger(args.log, args.blob_connection_string, args.log_container, args.log_blob)
 threads = [
-    Log4PotServerThread(logger, port, server_header=args.server_header)
+    Log4PotServerThread(logger, port, server_header=args.server_header, download_payloads=args.download_payloads,
+                        download_dir=args.download_dir)
     for port in args.port
 ]
 logger.log_start()
