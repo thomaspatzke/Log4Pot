@@ -4,6 +4,8 @@ import shutil
 import tempfile
 from pathlib import Path
 from typing import Union, Optional, Dict
+import sys
+
 
 try:
     import pycurl
@@ -39,7 +41,7 @@ def process_payloads(
         download_dir = Path(download_dir)
         new_path = download_dir.joinpath(uuid + ".dat")
         shutil.move(str(filepath), new_path)
-        data.update({"filepath": str(new_path)})
+        data["filepath"] = str(new_path)
     else:
         os.remove(str(filepath))
     return data
@@ -63,7 +65,7 @@ def load_file(url: str) -> Union[str, None]:
         curl = pycurl.Curl()
         curl.setopt(pycurl.URL, url)
         curl.setopt(pycurl.FOLLOWLOCATION, True)
-        curl.setopt(pycurl.USERAGENT, "Apache-Coyote/1.1")
+        curl.setopt(pycurl.USERAGENT, "Java/17.0.1")
         curl.setopt(pycurl.WRITEDATA, handle)
         curl.perform()
         status_code = curl.getinfo(pycurl.RESPONSE_CODE)
@@ -81,6 +83,7 @@ def process_file(filepath: str) -> Dict:
         data = handle.read()
     data = data.split()
     for idx, value in enumerate(data):
+        print(f"Got value {value}", file=sys.stderr)
         if ":" in data:
             content.update({value: data[idx + 1]})
     return content
