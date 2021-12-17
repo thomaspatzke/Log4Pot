@@ -4,8 +4,6 @@ import shutil
 import tempfile
 from pathlib import Path
 from typing import Union, Optional, Dict
-import sys
-
 
 try:
     import pycurl
