@@ -83,7 +83,6 @@ def process_file(filepath: str) -> Dict:
         data = handle.read()
     data = data.split()
     for idx, value in enumerate(data):
-        print(f"Got value {value}", file=sys.stderr)
-        if ":" in data:
+        if ":" in value:
             content.update({value: data[idx + 1]})
     return content
