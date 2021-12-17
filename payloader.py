@@ -81,6 +81,6 @@ def process_file(filepath: str) -> Dict:
         data = handle.read()
     data = data.split()
     for idx, value in enumerate(data):
-        if ":" in value:
+        if ":" in value and "http:" not in value:
             content.update({value: data[idx + 1]})
     return content
