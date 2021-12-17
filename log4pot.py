@@ -1,16 +1,18 @@
 # A honeypot for the Log4Shell vulnerability (CVE-2021-44228)
 
-import sys
-from dataclasses import dataclass
-from argparse import ArgumentParser
-from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import json
-from datetime import datetime
+import re
 import socket
+import sys
+from argparse import ArgumentParser
+from dataclasses import dataclass
+from datetime import datetime
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from threading import Thread
 from typing import Any, List, Optional
 from uuid import uuid4
-import re
-from threading import Thread
+
+from expression_parser import parse
 
 try:
     from azure.storage.blob import BlobServiceClient
@@ -24,12 +26,13 @@ except ImportError:
 
 re_exploit = re.compile("\${.*}")
 
+
 @dataclass
 class Logger:
-    logfile : str
-    blob_connection_str : Optional[str]
-    log_container : Optional[str]
-    log_blob : Optional[str]
+    logfile: str
+    blob_connection_str: Optional[str]
+    log_container: Optional[str]
+    log_blob: Optional[str]
 
     def __post_init__(self):
         self.f = open(self.logfile, "a")
@@ -42,7 +45,7 @@ class Logger:
         else:
             self.blob = None
 
-    def log(self, logtype : str, message : str, **kwargs):
+    def log(self, logtype: str, message: str, **kwargs):
         d = {
             "type": logtype,
             "timestamp": datetime.utcnow().isoformat(),
@@ -58,12 +61,14 @@ class Logger:
         self.log("start", "Log4Pot started")
 
     def log_request(self, server_port, client, port, request, headers, uuid):
-        self.log("request", "A request was received", correlation_id=str(uuid), server_port=server_port, client=client, port=port, request=request, headers=dict(headers))
+        self.log("request", "A request was received", correlation_id=str(uuid), server_port=server_port, client=client,
+                 port=port, request=request, headers=dict(headers))
 
     def log_exploit(self, location, payload, uuid):
-        self.log("exploit", "Exploit detected", correlation_id=str(uuid), location=location, payload=payload)
+        self.log("exploit", "Exploit detected", correlation_id=str(uuid), location=location, payload=payload,
+                 deobfuscated_payload=parse(payload))
 
-    def log_exception(self, e : Exception):
+    def log_exception(self, e: Exception):
         self.log("exception", "Exception occurred", exception=str(e))
 
     def log_end(self):
@@ -72,6 +77,7 @@ class Logger:
     def close(self):
         self.log_end()
         self.f.close()
+
 
 class Log4PotHTTPRequestHandler(BaseHTTPRequestHandler):
     def do(self):
@@ -85,12 +91,13 @@ class Log4PotHTTPRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(bytes(f'{{ "status": "ok", "id": "{self.uuid}" }}', "utf-8"))
 
         self.logger = self.server.logger
-        self.logger.log_request(self.server.server_address[1], *self.client_address, self.requestline, self.headers, self.uuid)
+        self.logger.log_request(self.server.server_address[1], *self.client_address, self.requestline, self.headers,
+                                self.uuid)
         self.find_exploit("request", self.requestline)
         for header, value in self.headers.items():
             self.find_exploit(f"header-{header}", value)
 
-    def find_exploit(self, location : str, content : str) -> bool:
+    def find_exploit(self, location: str, content: str) -> bool:
         if (m := re_exploit.search(content)):
             logger.log_exploit(location, m.group(0), self.uuid)
 
@@ -100,16 +107,19 @@ class Log4PotHTTPRequestHandler(BaseHTTPRequestHandler):
         else:
             return super().__getattribute__(__name)
 
+
 class Log4PotHTTPServer(ThreadingHTTPServer):
-    def __init__(self, logger : Logger, *args, **kwargs):
+    def __init__(self, logger: Logger, *args, **kwargs):
         self.logger = logger
         self.server_header = kwargs.pop("server_header", None)
         super().__init__(*args, **kwargs)
 
+
 class Log4PotServerThread(Thread):
-    def __init__(self, logger : Logger, port : int, *args, **kwargs):
+    def __init__(self, logger: Logger, port: int, *args, **kwargs):
         self.port = port
-        self.server = Log4PotHTTPServer(logger, ("", port), Log4PotHTTPRequestHandler, server_header=kwargs.pop("server_header", None))
+        self.server = Log4PotHTTPServer(logger, ("", port), Log4PotHTTPRequestHandler,
+                                        server_header=kwargs.pop("server_header", None))
         super().__init__(name=f"httpserver-{port}", *args, **kwargs)
 
     def run(self):
@@ -121,9 +131,11 @@ class Log4PotServerThread(Thread):
         except Exception as e:
             logger.log_exception(e)
 
+
 class Log4PotArgumentParser(ArgumentParser):
     def convert_arg_line_to_args(self, arg_line: str) -> List[str]:
         return arg_line.split()
+
 
 argparser = Log4PotArgumentParser(
     description="A honeypot for the Log4Shell vulnerability (CVE-2021-44228).",
@@ -145,7 +157,7 @@ if not azure_import and args.blob_connection_string is not None:
     sys.exit(2)
 
 logger = Logger(args.log, args.blob_connection_string, args.log_container, args.log_blob)
-threads  = [
+threads = [
     Log4PotServerThread(logger, port, server_header=args.server_header)
     for port in args.port
 ]
