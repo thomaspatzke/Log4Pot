@@ -1,2 +1,8 @@
 --blob-connection-string <Azure storage connection string as provided in UI>
 --server-header "Apache-Coyote/1.1"
+--port 8000
+--port 8008
+--port 8080
+--port 8081
+--port 8983
+--port 9200
