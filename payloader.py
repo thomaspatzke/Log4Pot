@@ -24,7 +24,7 @@ def process_payloads(
 ):
     if not pycurl_available:
         raise ImportError("Was not able to import pycurl correctly.")
-    
+
     url = extract_url(parsed_jndi_string)
     url = parse_url(url)
     if url.scheme not in [
@@ -39,7 +39,7 @@ def process_payloads(
         download_dir = Path(download_dir)
         new_path = download_dir.joinpath(uuid + ".dat")
         shutil.move(str(filepath), new_path)
-        data.update({"filepath": new_path})
+        data.update({"filepath": str(new_path)})
     else:
         os.remove(str(filepath))
     return data
