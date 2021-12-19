@@ -1,5 +1,7 @@
+import base64
 import io
 import os
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -44,12 +46,22 @@ def process_payloads(
     else:
         os.remove(str(filepath))
 
+    new_path = download_dir.joinpath(uuid + ".class.dat")
     if download_dir and download_class and "javaCodeBase" in data and "javaFactory" in data:
+        # Download referenced external javaCodeBase
         url = data["javaCodeBase"] + data["javaFactory"] + ".class"
         temp_path = load_file(url)
-        new_path = download_dir.joinpath(uuid + ".class.dat")
         shutil.move(temp_path, new_path)
         data["class_filepath"] = str(new_path)
+    elif download_dir and download_class and data.get("javaClassName", None) == "java.lang.String" and \
+            data.get("javaSerializedData", None):
+        # Base64 decode class serialized in javaSerializedData
+        jsd = data.get("javaSerializedData", "None")
+        if re.match(r"[a-zA-Z0-9+/]={0,3}", jsd):
+            jsd = base64.b64decode(jsd.encode("ascii"))
+            with io.open(new_path, "wb") as handle:
+                handle.write(jsd)
+            data["class_filepath"] = str(new_path)
     return data
 
 
