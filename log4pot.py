@@ -112,7 +112,8 @@ class Log4PotHTTPRequestHandler(BaseHTTPRequestHandler):
                         parse(m.group(0)),
                         str(self.uuid),
                         self.server.download_dir,
-                        self.server.download_class
+                        self.server.download_class,
+                        self.server.download_timeout
                     )
                     self.logger.log_payload(self.uuid, **data)
                 except Exception as e:
@@ -132,6 +133,7 @@ class Log4PotHTTPServer(ThreadingHTTPServer):
         self.download_payloads = kwargs.pop("download_payloads", False),
         self.download_dir = kwargs.pop("download_dir", None)
         self.download_class = kwargs.pop("download_class", None)
+        self.download_timeout = kwargs.pop("download_timeout", None)
         super().__init__(*args, **kwargs)
 
 
@@ -145,7 +147,8 @@ class Log4PotServerThread(Thread):
             server_header=kwargs.pop("server_header", None),
             download_payloads=kwargs.pop("download_payloads", False),
             download_dir=kwargs.pop("download_dir", None),
-            download_class=kwargs.pop("download_class", None)
+            download_class=kwargs.pop("download_class", None),
+            download_timeout=kwargs.pop("download_timeout", None)
         )
         super().__init__(name=f"httpserver-{port}", *args, **kwargs)
 
@@ -180,6 +183,7 @@ argparser.add_argument("--download-class", action="store_true", default=False,
                        help="[EXPERIMENTAL] Implement downloading Java Class file referenced by the payload..")
 argparser.add_argument("--download-dir", type=str, help="Set a download directory. If given, payloads are stored "
                                                         "persistently and are not deleted after analysis.")
+argparser.add_argument("--download-timeout", type=int, default=10, help="Set download timeout for payloads.")
 
 args = argparser.parse_args()
 if args.port is None:
@@ -192,7 +196,8 @@ if not azure_import and args.blob_connection_string is not None:
 logger = Logger(args.log, args.blob_connection_string, args.log_container, args.log_blob)
 threads = [
     Log4PotServerThread(logger, port, server_header=args.server_header, download_payloads=args.download_payloads,
-                        download_dir=args.download_dir, download_class=args.download_class)
+                        download_dir=args.download_dir, download_class=args.download_class,
+                        download_timeout=args.download_timeout)
     for port in args.port
 ]
 logger.log_start()
