@@ -56,7 +56,7 @@ def process_payloads(
     elif download_dir and download_class and data.get("javaClassName", None) == "java.lang.String" and \
             data.get("javaSerializedData", None):
         # Base64 decode class serialized in javaSerializedData
-        jsd = data.get("javaSerializedData", "None")
+        jsd = data.get("javaSerializedData", "")
         if re.match(r"[a-zA-Z0-9+/]={0,3}", jsd):
             jsd = base64.b64decode(jsd.encode("ascii"))
             with io.open(new_path, "wb") as handle:
