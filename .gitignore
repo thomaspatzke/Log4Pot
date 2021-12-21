@@ -1,2 +1,4 @@
 log4pot.log
-log4pot.conf
+*.conf
+samples/
+__pycache__/
