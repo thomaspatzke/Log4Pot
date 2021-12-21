@@ -28,24 +28,13 @@ except ImportError:
 
 re_exploit = re.compile("\${.*}")
 
-
 @dataclass
 class Logger:
-    logfile: str
-    blob_connection_str: Optional[str]
-    log_container: Optional[str]
-    log_blob: Optional[str]
+    log_file: str
+    log_blob: Optional["azure.storage.blob.BlobClient"]
 
     def __post_init__(self):
-        self.f = open(self.logfile, "a")
-        if self.blob_connection_str is not None and 'azure.storage.blob' in sys.modules:
-            service_client = BlobServiceClient.from_connection_string(self.blob_connection_str)
-            container = service_client.get_container_client(self.log_container)
-            blob = container.get_blob_client(self.log_blob)
-            blob.exists() or blob.create_append_blob()
-            self.blob = blob
-        else:
-            self.blob = None
+        self.f = open(self.log_file, "a")
 
     def log(self, logtype: str, message: str, **kwargs):
         d = {
@@ -56,8 +45,8 @@ class Logger:
         j = json.dumps(d) + "\n"
         self.f.write(j)
         self.f.flush()
-        if self.blob is not None:
-            self.blob.append_block(j)
+        if self.log_blob is not None:
+            self.log_blob.append_block(j)
 
     def log_start(self):
         self.log("start", "Log4Pot started")
@@ -112,6 +101,7 @@ class Log4PotHTTPRequestHandler(BaseHTTPRequestHandler):
                         parse(m.group(0)),
                         str(self.uuid),
                         self.server.download_dir,
+                        self.server.download_container,
                         self.server.download_class,
                         self.server.download_timeout
                     )
@@ -132,6 +122,7 @@ class Log4PotHTTPServer(ThreadingHTTPServer):
         self.server_header = kwargs.pop("server_header", None)
         self.download_payloads = kwargs.pop("download_payloads", False),
         self.download_dir = kwargs.pop("download_dir", None)
+        self.download_container = kwargs.pop("download_container", None)
         self.download_class = kwargs.pop("download_class", None)
         self.download_timeout = kwargs.pop("download_timeout", None)
         super().__init__(*args, **kwargs)
@@ -147,6 +138,7 @@ class Log4PotServerThread(Thread):
             server_header=kwargs.pop("server_header", None),
             download_payloads=kwargs.pop("download_payloads", False),
             download_dir=kwargs.pop("download_dir", None),
+            download_container=kwargs.pop("download_container", None),
             download_class=kwargs.pop("download_class", None),
             download_timeout=kwargs.pop("download_timeout", None)
         )
@@ -174,7 +166,7 @@ argparser = Log4PotArgumentParser(
 argparser.add_argument("--port", "-p", action="append", type=int, help="Listening port")
 argparser.add_argument("--log", "-l", type=str, default="log4pot.log", help="Log file")
 argparser.add_argument("--blob-connection-string", "-b", help="Azure blob storage connection string.")
-argparser.add_argument("--log-container", "-lc", default="logs", help="Azure blob container for logs.")
+argparser.add_argument("--log-container", "-lc", type=str, default="logs", help="Azure blob container for logs.")
 argparser.add_argument("--log-blob", "-lb", default=socket.gethostname() + ".log", help="Azure blob for logs.")
 argparser.add_argument("--server-header", type=str, default=None, help="Replace the default server header.")
 argparser.add_argument("--download-payloads", action="store_true", default=False,
@@ -183,21 +175,38 @@ argparser.add_argument("--download-class", action="store_true", default=False,
                        help="[EXPERIMENTAL] Implement downloading Java Class file referenced by the payload..")
 argparser.add_argument("--download-dir", type=str, help="Set a download directory. If given, payloads are stored "
                                                         "persistently and are not deleted after analysis.")
+argparser.add_argument("--download-container", type=str, default="samples", help="Azure blob container for downloaded payloads.")
 argparser.add_argument("--download-timeout", type=int, default=10, help="Set download timeout for payloads.")
 
 args = argparser.parse_args()
 if args.port is None:
     print("No port specified!", file=sys.stderr)
     sys.exit(1)
-if not azure_import and args.blob_connection_string is not None:
-    print("Azure logging requested but no dependency installed!")
-    sys.exit(2)
+if args.blob_connection_string is not None:
+    if not azure_import:
+        print("Azure logging requested but no dependency installed!")
+        sys.exit(2)
+    service_client = BlobServiceClient.from_connection_string(args.blob_connection_string)
+    log_container = service_client.get_container_client(args.log_container)
+    download_container = service_client.get_container_client(args.download_container)
+    log_blob = log_container.get_blob_client(args.log_blob)
+    log_blob.exists() or log_blob.create_append_blob()
+else:
+    log_blob = None
+    download_container = None
 
-logger = Logger(args.log, args.blob_connection_string, args.log_container, args.log_blob)
+logger = Logger(args.log, log_blob)
 threads = [
-    Log4PotServerThread(logger, port, server_header=args.server_header, download_payloads=args.download_payloads,
-                        download_dir=args.download_dir, download_class=args.download_class,
-                        download_timeout=args.download_timeout)
+    Log4PotServerThread(
+        logger,
+        port,
+        server_header=args.server_header,
+        download_payloads=args.download_payloads,
+        download_dir=args.download_dir,
+        download_container=download_container,
+        download_class=args.download_class,
+        download_timeout=args.download_timeout,
+        )
     for port in args.port
 ]
 logger.log_start()
