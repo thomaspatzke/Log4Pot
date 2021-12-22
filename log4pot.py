@@ -13,7 +13,7 @@ from typing import Any, List, Optional
 from uuid import uuid4
 
 from expression_parser import parse
-from payloader import process_payloads, pycurl_available
+from payloader import Payloader, pycurl_available
 
 try:
     from azure.storage.blob import BlobServiceClient
@@ -62,8 +62,8 @@ class Logger:
     def log_payload(self, uuid, **kwargs):
         self.log("payload", "Payload downloaded", correlation_id=str(uuid), **kwargs)
 
-    def log_exception(self, e: Exception):
-        self.log("exception", "Exception occurred", exception=str(e))
+    def log_exception(self, e: Exception, **kwargs):
+        self.log("exception", "Exception occurred", exception=str(e), **kwargs)
 
     def log_end(self):
         self.log("end", "Log4Pot stopped")
@@ -95,19 +95,14 @@ class Log4PotHTTPRequestHandler(BaseHTTPRequestHandler):
         if (m := re_exploit.search(content)):
             logger.log_exploit(location, m.group(0), self.uuid)
 
-            if self.server.download_payloads:
+            if self.server.payloader:
                 try:
-                    data = process_payloads(
+                    data = self.server.payloader.process_payloads(
                         parse(m.group(0)),
-                        str(self.uuid),
-                        self.server.download_dir,
-                        self.server.download_container,
-                        self.server.download_class,
-                        self.server.download_timeout
                     )
                     self.logger.log_payload(self.uuid, **data)
                 except Exception as e:
-                    self.logger.log_exception(e)
+                    self.logger.log_exception(e, correlation_id=str(self.uuid))
 
     def __getattribute__(self, __name: str) -> Any:
         if __name.startswith("do_"):
@@ -117,30 +112,22 @@ class Log4PotHTTPRequestHandler(BaseHTTPRequestHandler):
 
 
 class Log4PotHTTPServer(ThreadingHTTPServer):
-    def __init__(self, logger: Logger, *args, **kwargs):
+    def __init__(self, logger: Logger, payloader : Payloader, server_header : str, *args, **kwargs):
         self.logger = logger
-        self.server_header = kwargs.pop("server_header", None)
-        self.download_payloads = kwargs.pop("download_payloads", False),
-        self.download_dir = kwargs.pop("download_dir", None)
-        self.download_container = kwargs.pop("download_container", None)
-        self.download_class = kwargs.pop("download_class", None)
-        self.download_timeout = kwargs.pop("download_timeout", None)
+        self.payloader = payloader
+        self.server_header = server_header
         super().__init__(*args, **kwargs)
 
 
 class Log4PotServerThread(Thread):
-    def __init__(self, logger: Logger, port: int, *args, **kwargs):
+    def __init__(self, logger: Logger, payloader : Payloader, server_header : str, port: int, *args, **kwargs):
         self.port = port
         self.server = Log4PotHTTPServer(
             logger,
+            payloader,
+            server_header,
             ("", port),
             Log4PotHTTPRequestHandler,
-            server_header=kwargs.pop("server_header", None),
-            download_payloads=kwargs.pop("download_payloads", False),
-            download_dir=kwargs.pop("download_dir", None),
-            download_container=kwargs.pop("download_container", None),
-            download_class=kwargs.pop("download_class", None),
-            download_timeout=kwargs.pop("download_timeout", None)
         )
         super().__init__(name=f"httpserver-{port}", *args, **kwargs)
 
@@ -169,22 +156,18 @@ argparser.add_argument("--blob-connection-string", "-b", help="Azure blob storag
 argparser.add_argument("--log-container", "-lc", type=str, default="logs", help="Azure blob container for logs.")
 argparser.add_argument("--log-blob", "-lb", default=socket.gethostname() + ".log", help="Azure blob for logs.")
 argparser.add_argument("--server-header", type=str, default=None, help="Replace the default server header.")
-argparser.add_argument("--download-payloads", action="store_true", default=False,
-                       help="[EXPERIMENTAL] Download http(s) and ldap payloads and log indicators.")
-argparser.add_argument("--download-class", action="store_true", default=False,
-                       help="[EXPERIMENTAL] Implement downloading Java Class file referenced by the payload..")
-argparser.add_argument("--download-dir", type=str, help="Set a download directory. If given, payloads are stored "
-                                                        "persistently and are not deleted after analysis.")
-argparser.add_argument("--download-container", type=str, default="samples", help="Azure blob container for downloaded payloads.")
-argparser.add_argument("--download-timeout", type=int, default=10, help="Set download timeout for payloads.")
+argparser.add_argument("--payloader", "-P", action="store_true", help="Download any analyze payloads from exploit attempts.")
+argparser.add_argument("--download-dir", "-dd", type=str, help="Set a download directory for payloader. Only analysis is conducted ")
+argparser.add_argument("--download-container", "-dc", type=str, help="Azure blob container for downloaded payloads.")
+argparser.add_argument("--download-timeout", "-dt", type=int, default=10, help="Set download timeout for payloads.")
 
 args = argparser.parse_args()
 if args.port is None:
     print("No port specified!", file=sys.stderr)
     sys.exit(1)
 
-if not pycurl_available and (args.download_payloads or args.download_class or args.download_dir or args.download_container):
-        print("Payload download requested but no pycurl installed!")
+if not pycurl_available and args.payloader:
+        print("Payload analysis requested but no pycurl installed!")
         sys.exit(2)
 
 if args.blob_connection_string is not None:
@@ -201,16 +184,17 @@ else:
     download_container = None
 
 logger = Logger(args.log, log_blob)
+if args.payloader:
+    payloader = Payloader(args.download_dir, download_container, args.download_timeout)
+else:
+    payloader = None
+
 threads = [
     Log4PotServerThread(
         logger,
+        payloader,
+        args.server_header,
         port,
-        server_header=args.server_header,
-        download_payloads=args.download_payloads,
-        download_dir=args.download_dir,
-        download_container=download_container,
-        download_class=args.download_class,
-        download_timeout=args.download_timeout,
         )
     for port in args.port
 ]

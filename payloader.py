@@ -3,11 +3,12 @@ import io
 import os
 import re
 import shutil
-import tempfile
+from tempfile import TemporaryFile
 from pathlib import Path
-from typing import Union, Optional, Dict
-from urllib3.util.url import parse_url
+from typing import Union, Optional, Dict, BinaryIO
+from urllib.parse import urlparse
 from hashlib import sha256
+from dataclasses import dataclass
 
 try:
     import pycurl
@@ -19,108 +20,118 @@ except ImportError as e:
     )
     pycurl_available = False
 
-def process_payloads(
-        parsed_jndi_string: str,
-        uuid: str,
-        download_dir: Optional[str] = None,
-        upload_container: Optional["azure.storage.blob.ContainerClient"] = None,
-        download_class: Optional[bool] = False,
-        download_timeout: Optional[int] = 10
-):
-    if not pycurl_available:
-        raise ImportError("Was not able to import pycurl correctly.")
+@dataclass
+class Payloader:
+    """Download and analyze exploit payloads."""
+    download_dir: Optional[str] = None,
+    upload_container: Optional["azure.storage.blob.ContainerClient"] = None,
+    download_timeout: int = 10
 
-    url = extract_url(parsed_jndi_string)
-    url = parse_url(url)
-    if url.scheme not in [
-        "https",
-        "http",
-        "ldap"
-    ]:
-        raise ValueError(f"Cannot process {url.scheme} URLs.")
-    filepath = load_file(str(url), download_timeout)
-    data = process_file(filepath)
-    data["jndi_sha256"] = upload_file(upload_container, filepath)
+    def process_payloads(self, parsed_jndi_string: str):
+        if not pycurl_available:
+            raise ImportError("Was not able to import pycurl correctly.")
 
-    if download_dir:
-        download_dir = Path(download_dir)
-        new_path = download_dir.joinpath(uuid + ".dat")
-        shutil.move(str(filepath), new_path)
-        data["filepath"] = str(new_path)
+        url = self.extract_url(parsed_jndi_string)
+        url = urlparse(url)
+        data = dict()
+        if url.scheme == "ldap":
+            with TemporaryFile() as f:
+                self.curl(url.geturl(), f)
+                data = self.process_ldap_response(f)
+                ldap_destination_name = data["ldap_sha256"]
+                self.store_file(f, ldap_destination_name)
+                self.load_ldap_class(data)
+        else:
+            raise ValueError(f"Cannot process {url.scheme} JNDI URLs.")
+        return data
 
-        new_path = download_dir.joinpath(uuid + ".class.dat")
-        if download_class:
+
+    def process_ldap_response(self, f : BinaryIO) -> Dict:
+        content = {}
+        f.seek(0)
+        data = f.read()
+        h = sha256(data).hexdigest()
+        data = str(data, "utf-8").split()
+        for idx, value in enumerate(data):
+            if ":" in value and "http:" not in value:
+                content.update({value.strip(":"): data[idx + 1]})
+        content["ldap_sha256"] = h
+        return content
+
+
+    def load_ldap_class(self, data : Dict):
+        with TemporaryFile() as f:
             if "javaCodeBase" in data and "javaFactory" in data:
                 # Download referenced external javaCodeBase
+                data["class_type"] = "url_reference"
                 url = data["javaCodeBase"] + data["javaFactory"] + ".class"
-                temp_path = load_file(url)
-                shutil.move(temp_path, new_path)
-                data["class_filepath"] = str(new_path)
-                data["class_sha256"] = upload_file(upload_container, new_path)
+                self.curl(url, f)
+                f.seek(0)
+                class_content = f.read()
             elif data.get("javaClassName", "") == "java.lang.String" and \
                     data.get("javaSerializedData", None):
                 # Base64 decode class serialized in javaSerializedData
-                jsd = data.get("javaSerializedData", "")
-                if re.match(r"[a-zA-Z0-9+/]={0,3}", jsd):
-                    jsd = base64.b64decode(jsd.encode("ascii"))
-                    with io.open(new_path, "wb") as handle:
-                        handle.write(jsd)
-                    data["class_filepath"] = str(new_path)
-                data["class_sha256"] = upload_file(upload_container, new_path)
-    else:
-        os.remove(str(filepath))
-    return data
+                class_content = data.get("javaSerializedData", "")
+                if re.match(r"[a-zA-Z0-9+/]={0,3}", class_content):
+                    data["class_type"] = "serialized"
+                    class_content = base64.b64decode(class_content.encode("ascii"))
+                    f.write(class_content)
+                else:
+                    data["class_type"] = "serialized_invalid"
+                    return
+            else:
+                data["class_type"] = "unknwon"
+                return
+            h = sha256(class_content).hexdigest()
+            data["class_sha256"] = h
+            self.store_file(f, h)
 
 
-def extract_url(url: str):
-    """Parse URL from jndi expression."""
-    index = url.find("jndi:")
-    url = url[index + 5:]
-    if "${" in url:
-        raise ValueError(
-            "URL seems to include either further expressions - try the expression parser - or environment variables.")
-    return url.strip("{}")
+    def extract_url(self, url: str):
+        """Parse URL from jndi expression."""
+        index = url.find("jndi:")
+        url = url[index + 5:]
+        if "${" in url:
+            raise ValueError(
+                "URL seems to include either further expressions - try the expression parser - or environment variables.")
+        return url.strip("{}")
 
 
-def load_file(url: str, timeout: Optional[int] = 10) -> Union[str, None]:
-    """Downloads data from URL, creates and writes into a temporary file and return temporary file path."""
-    fd, tmp = tempfile.mkstemp()
-    status_code = 200
-    with os.fdopen(fd, mode="wb") as handle:
+    def curl(self, url: str, f) -> Union[str, None]:
+        """Downloads data from URL, creates and writes into a temporary file and return temporary file path."""
         curl = pycurl.Curl()
         curl.setopt(pycurl.URL, url)
         curl.setopt(pycurl.FOLLOWLOCATION, True)
         curl.setopt(pycurl.USERAGENT, "Java/17.0.1")
-        curl.setopt(pycurl.WRITEDATA, handle)
-        curl.setopt(pycurl.TIMEOUT, timeout)
+        curl.setopt(pycurl.WRITEDATA, f)
+        curl.setopt(pycurl.TIMEOUT, self.download_timeout)
         curl.perform()
         status_code = curl.getinfo(pycurl.RESPONSE_CODE)
         curl.close()
 
-    if status_code > 302:
-        os.remove(tmp)
-        raise FileNotFoundError("Server returned HTTP404, deleted the temporary file.")
-    return tmp
+        if status_code > 302:
+            raise FileNotFoundError("Server returned HTTP404, deleted the temporary file.")
 
 
-def process_file(filepath: str) -> Dict:
-    content = {}
-    with io.open(filepath, encoding="utf-8") as handle:
-        data = handle.read()
-    data = data.split()
-    for idx, value in enumerate(data):
-        if ":" in value and "http:" not in value:
-            content.update({value.strip(":"): data[idx + 1]})
-    return content
+    def store_file(self, f : BinaryIO, dest_name : str):
+        self.copy_to_download(f, dest_name)
+        self.upload_file_to_azure_blob(f, dest_name)
 
-def upload_file(container : Optional["azure.storage.blob.ContainerClient"], file_name : str) -> str:
-    """Upload file to Azure blob storage with SHA256 as name. Check if it already exists before upload. Return SHA256 of file in any case."""
-    if container is not None:
-        f = open(file_name, "rb")
-        d = f.read()
-        f.close()
-        h = sha256(d).hexdigest()
-        blob = container.get_blob_client(h)
-        if not blob.exists():
-            blob.upload_blob(d, length=len(d))
-        return h
+
+    def copy_to_download(self, sf : BinaryIO, dest_name : str):
+        if self.download_dir:
+            dest_path = Path(self.download_dir) / dest_name
+            if not dest_path.exists():
+                with dest_path.open("wb") as df:
+                    sf.seek(0)
+                    shutil.copyfileobj(sf, df)
+
+
+    def upload_file_to_azure_blob(self, f : BinaryIO, target_name : str):
+        """Upload file to Azure blob storage with SHA256 as name. Check if it already exists before upload."""
+        if self.upload_container is not None:
+            f.seek(0)
+            d = f.read()
+            blob = self.upload_container.get_blob_client(target_name)
+            if not blob.exists():
+                blob.upload_blob(d, length=len(d))
