@@ -26,6 +26,8 @@ def parse(exp: str):
             if len(result) > 2:
                 result += "${"
             result += sub_exp
+        else:
+            result += sub_exp
     result += "}"
     return result
 

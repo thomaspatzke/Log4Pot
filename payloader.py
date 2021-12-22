@@ -34,15 +34,22 @@ class Payloader:
         url = self.extract_url(parsed_jndi_string)
         url = urlparse(url)
         data = dict()
-        if url.scheme == "ldap":
-            with TemporaryFile() as f:
+        with TemporaryFile() as f:
+            if url.scheme == "ldap":            # ldap://
+                data["jndi_handler"] = "ldap"
                 self.curl(url.geturl(), f)
                 data = self.process_ldap_response(f)
                 ldap_destination_name = data["ldap_sha256"]
                 self.store_file(f, ldap_destination_name)
                 self.load_ldap_class(data)
-        else:
-            raise ValueError(f"Cannot process {url.scheme} JNDI URLs.")
+            else:                               # everything else: pass to curl and hope it's able to handle it.
+                data["jndi_handler"] = "generic"
+                self.curl(url.geturl(), f)
+                f.seek(0)
+                h = sha256(f.read()).hexdigest()
+                data["generic_sha256"] = h
+                self.store_file(f, h)
+
         return data
 
 
