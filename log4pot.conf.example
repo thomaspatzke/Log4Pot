@@ -1,4 +1,7 @@
 --blob-connection-string <Azure storage connection string as provided in UI>
+--payloader
+--download-dir samples
+--download-container samples
 --server-header "Apache-Coyote/1.1"
 --port 8000
 --port 8008
