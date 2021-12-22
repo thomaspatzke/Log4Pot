@@ -13,7 +13,7 @@ from typing import Any, List, Optional
 from uuid import uuid4
 
 from expression_parser import parse
-from payloader import process_payloads
+from payloader import process_payloads, pycurl_available
 
 try:
     from azure.storage.blob import BlobServiceClient
@@ -182,9 +182,14 @@ args = argparser.parse_args()
 if args.port is None:
     print("No port specified!", file=sys.stderr)
     sys.exit(1)
+
+if not pycurl_available and (args.download_payloads or args.download_class or args.download_dir or args.download_container):
+        print("Payload download requested but no pycurl installed!")
+        sys.exit(2)
+
 if args.blob_connection_string is not None:
     if not azure_import:
-        print("Azure logging requested but no dependency installed!")
+        print("Azure logging requested but no azure package installed!")
         sys.exit(2)
     service_client = BlobServiceClient.from_connection_string(args.blob_connection_string)
     log_container = service_client.get_container_client(args.log_container)
