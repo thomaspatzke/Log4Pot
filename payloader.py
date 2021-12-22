@@ -1,11 +1,10 @@
 import base64
-import io
-import os
+import binascii
 import re
 import shutil
 from tempfile import TemporaryFile
 from pathlib import Path
-from typing import Union, Optional, Dict, BinaryIO
+from typing import Set, Union, Optional, Dict, BinaryIO
 from urllib.parse import urlparse
 from hashlib import sha256
 from dataclasses import dataclass
@@ -19,6 +18,13 @@ except ImportError as e:
         f"Pycurl not available or there is an issue with curl dependencies: {e}"
     )
     pycurl_available = False
+
+re_urls = [     # Regular expressions for extraction of URLs from payloads and downloaded samples.
+    re.compile(b'\w{3,5}://[^\x00-\x20;"\')\x7b-\xff]+'),                   # URLs prefixed with scheme and :// until first appearance of nonprintable or ending character.
+    re.compile(b'(?<=\s)\w+(?:\.\w+){2,}/[^\x00-\x20;"\')\x7b-\xff]+'),     # HTTP URLs without scheme. Preceded by whitespace followed by IP/domain name with at least two dots and continuing until first nonprintable or ending character appears.
+]
+re_url_exclusion = re.compile("(?:github|google|gstatic|upx)")
+re_base64_cmd = re.compile('Command/Base64/([a-zA-Z0-9+/]+={0,3})')
 
 @dataclass
 class Payloader:
@@ -35,20 +41,43 @@ class Payloader:
         url = urlparse(url)
         data = dict()
         with TemporaryFile() as f:
-            if url.scheme == "ldap":            # ldap://
+            if url.scheme.startswith("ldap"):            # ldap://
                 data["jndi_handler"] = "ldap"
-                self.curl(url.geturl(), f)
+                try:
+                    self.curl(url.geturl(), f)
+                except Exception as e:
+                    data["error"] = str(e)
+                    return data
                 data = self.process_ldap_response(f)
                 ldap_destination_name = data["ldap_sha256"]
                 self.store_file(f, ldap_destination_name)
-                self.load_ldap_class(data)
+
+                # extract or download exploit class
+                class_content = self.load_ldap_class(data)
+                if class_content is not None:
+                    urls = self.extract_urls_from_payload(class_content)
+                else:
+                    urls = set()
+
+                # extract command from base64 encoded DN part used in common JNDI exploits
+                if (m := re_base64_cmd.search(data.get("DN", ""))):
+                    try:
+                        decoded = base64.b64decode(m.group(1))
+                        urls.update(self.extract_urls_from_payload(decoded))
+                    except binascii.Error:
+                        pass
+
+                data["urls"] = self.load_urls_recursively(urls)
+
             else:                               # everything else: pass to curl and hope it's able to handle it.
                 data["jndi_handler"] = "generic"
-                self.curl(url.geturl(), f)
-                f.seek(0)
-                h = sha256(f.read()).hexdigest()
-                data["generic_sha256"] = h
-                self.store_file(f, h)
+                try:
+                    self.curl(url.geturl(), f)
+                except Exception as e:
+                    data["error"] = str(e)
+                    return data
+                h = self.hash_file(f)
+                data["generic_sha256"] = self.store_file(f)
 
         return data
 
@@ -66,13 +95,18 @@ class Payloader:
         return content
 
 
-    def load_ldap_class(self, data : Dict):
+    def load_ldap_class(self, data : Dict) -> Optional[bytes]:
+        """Loads class referenced or contained serialized in LDAP object."""
         with TemporaryFile() as f:
             if "javaCodeBase" in data and "javaFactory" in data:
                 # Download referenced external javaCodeBase
                 data["class_type"] = "url_reference"
                 url = data["javaCodeBase"] + data["javaFactory"] + ".class"
-                self.curl(url, f)
+                try:
+                    self.curl(url, f)
+                except Exception as e:
+                    data["error"] = str(e)
+                    return
                 f.seek(0)
                 class_content = f.read()
             elif data.get("javaClassName", "") == "java.lang.String" and \
@@ -90,9 +124,8 @@ class Payloader:
                 data["class_type"] = "unknwon"
                 return
             h = sha256(class_content).hexdigest()
-            data["class_sha256"] = h
-            self.store_file(f, h)
-
+            data["class_sha256"] = self.store_file(f)
+            return class_content
 
     def extract_url(self, url: str):
         """Parse URL from jndi expression."""
@@ -104,8 +137,50 @@ class Payloader:
         return url.strip("{}")
 
 
-    def curl(self, url: str, f) -> Union[str, None]:
-        """Downloads data from URL, creates and writes into a temporary file and return temporary file path."""
+    def extract_urls_from_payload(self, payload : bytes) -> Set[str]:
+        """Extract all URLs from a (binary) payload."""
+        return {
+                    str(url, "iso-8859-1")
+                    for re_url in re_urls
+                    for url in re_url.findall(payload)
+                }
+
+    def load_urls_recursively(self, urls : Set[str], visited_urls : Set[str] = set(), visit_limit : int = 10) -> Dict[str, str]:
+        """
+        Download payloads from URLs and recursively visit contained URLs. Tracks visited URLs and sets upper limit for URL count.
+
+        Return dict with URL mapped to the hash of the downloaded payload.
+        """
+        url_info = dict()
+        content_urls = set()
+        for url in urls:
+            if url not in visited_urls:
+                if re_url_exclusion.search(url):
+                    url_info[url] = "excluded"
+                else:
+                    with TemporaryFile() as f:
+                        try:
+                            self.curl(url, f)
+                            url_info[url] = self.store_file(f)
+                        except Exception as e:
+                            url_info[url] = "error: " + str(e)
+                        visited_urls.add(url)
+                        f.seek(0)
+                        content = f.read()
+                    content_urls.update(self.extract_urls_from_payload(content))
+                    if len(visited_urls) >= visit_limit:
+                        return url_info
+
+        for url in content_urls:
+            url_info.update(self.load_urls_recursively(content_urls, visited_urls))
+            if len(visited_urls) >= visit_limit:
+                return url_info
+
+        return url_info
+
+
+    def curl(self, url: str, f):
+        """Downloads data from URL, creates and writes into a temporary file."""
         curl = pycurl.Curl()
         curl.setopt(pycurl.URL, url)
         curl.setopt(pycurl.FOLLOWLOCATION, True)
@@ -117,12 +192,22 @@ class Payloader:
         curl.close()
 
         if status_code > 302:
-            raise FileNotFoundError("Server returned HTTP404, deleted the temporary file.")
+            return False
+        else:
+            return True
 
+    def hash_file(self, f : BinaryIO) -> str:
+        """Calculate SHA256 on file descriptor and return it hex-encoded."""
+        f.seek(0)
+        return sha256(f.read()).hexdigest()
 
-    def store_file(self, f : BinaryIO, dest_name : str):
+    def store_file(self, f : BinaryIO, dest_name : Optional[str] = None) -> str:
+        """Store file in file system and Azure blob storage and return target name, which is specified or calculated (SHA256 of content)."""
+        if dest_name is None:
+            dest_name = self.hash_file(f)
         self.copy_to_download(f, dest_name)
         self.upload_file_to_azure_blob(f, dest_name)
+        return dest_name
 
 
     def copy_to_download(self, sf : BinaryIO, dest_name : str):
