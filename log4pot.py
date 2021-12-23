@@ -16,6 +16,7 @@ from uuid import uuid4
 
 from expression_parser import parse
 from payloader import Payloader, pycurl_available
+from s3 import S3Log
 
 try:
     from azure.storage.blob import BlobServiceClient
@@ -28,12 +29,21 @@ except ImportError:
     )
     azure_import = False
 
+try:
+    import boto3
+except ImportError:
+    print(
+        "AWS python dependencies (boto3) not installed, logging to S3 storage not available.",
+        file=sys.stderr
+    )
+
 re_exploit = re.compile("\${.*}")
 
 @dataclass
 class Logger:
     log_file: str
     log_blob: Optional["azure.storage.blob.BlobClient"]
+    s3_log: Optional["S3Log"] = None
 
     def __post_init__(self):
         self.f = open(self.log_file, "a")
@@ -49,6 +59,9 @@ class Logger:
         self.f.flush()
         if self.log_blob is not None:
             self.log_blob.append_block(j)
+
+        if self.s3_log is not None:
+            self.s3_log.log(j)
 
     def log_start(self):
         self.log("start", "Log4Pot started")
@@ -170,6 +183,7 @@ argparser.add_argument("--payloader", "-P", action="store_true", help="Download 
 argparser.add_argument("--download-dir", "-dd", type=str, help="Set a download directory for payloader. Only analysis is conducted ")
 argparser.add_argument("--download-container", "-dc", type=str, help="Azure blob container for downloaded payloads.")
 argparser.add_argument("--download-timeout", "-dt", type=int, default=10, help="Set download timeout for payloads.")
+argparser.add_argument("--s3_bucket", type=str, help="S3 bucket to upload logs to")
 
 args = argparser.parse_args()
 if args.port is None:
@@ -200,9 +214,20 @@ else:
     log_blob = None
     download_container = None
 
-logger = Logger(args.log, log_blob)
+if args.s3_bucket is not None:
+    if not 'boto3' in sys.modules:
+        print("S3 logging request but no dependency (boto3) installed! exiting!")
+        sys.exit(2)
+    else:
+        s3_client=boto3.client('s3')
+        s3log=S3Log(s3_client, threshold=500, bucket=args.s3_bucket)
+else:
+    s3log = None
+
+
+logger = Logger(args.log, log_blob, s3log)
 if args.payloader:
-    payloader = Payloader(args.download_dir, download_container, args.download_timeout)
+    payloader = Payloader(args.download_dir, download_container, args.download_timeout, s3log)
 else:
     payloader = None
 
