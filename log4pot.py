@@ -1,6 +1,7 @@
 # A honeypot for the Log4Shell vulnerability (CVE-2021-44228)
 
 import json
+from pathlib import Path
 import re
 import socket
 import sys
@@ -8,6 +9,7 @@ from argparse import ArgumentParser
 from dataclasses import dataclass
 from datetime import datetime
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+import ssl
 from threading import Thread
 from typing import Any, List, Optional
 from uuid import uuid4
@@ -120,7 +122,7 @@ class Log4PotHTTPServer(ThreadingHTTPServer):
 
 
 class Log4PotServerThread(Thread):
-    def __init__(self, logger: Logger, payloader : Payloader, server_header : str, port: int, *args, **kwargs):
+    def __init__(self, logger: Logger, payloader : Payloader, server_header : str, port: int, tls : bool, certificate : Optional[str] = None, *args, **kwargs):
         self.port = port
         self.server = Log4PotHTTPServer(
             logger,
@@ -129,6 +131,13 @@ class Log4PotServerThread(Thread):
             ("", port),
             Log4PotHTTPRequestHandler,
         )
+        if tls:
+            self.server.socket = ssl.wrap_socket(
+                self.server.socket,
+                server_side=True,
+                certfile=certificate,
+                ssl_version=ssl.PROTOCOL_TLSv1_2
+                )
         super().__init__(name=f"httpserver-{port}", *args, **kwargs)
 
     def run(self):
@@ -150,7 +159,8 @@ argparser = Log4PotArgumentParser(
     description="A honeypot for the Log4Shell vulnerability (CVE-2021-44228).",
     fromfile_prefix_chars="@",
 )
-argparser.add_argument("--port", "-p", action="append", type=int, help="Listening port")
+argparser.add_argument("--port", "-p", action="append", type=str, help="Listening port. Prepend with 'S' to configure as TLS secured port. Certificate is configured with --certificate.")
+argparser.add_argument("--certificate", "-c", type=str, help="Certificate used for TLS.")
 argparser.add_argument("--log", "-l", type=str, default="log4pot.log", help="Log file")
 argparser.add_argument("--blob-connection-string", "-b", help="Azure blob storage connection string.")
 argparser.add_argument("--log-container", "-lc", type=str, default="logs", help="Azure blob container for logs.")
@@ -165,6 +175,13 @@ args = argparser.parse_args()
 if args.port is None:
     print("No port specified!", file=sys.stderr)
     sys.exit(1)
+
+if any([
+    (port.startswith("s") or port.startswith("S"))
+    for port in args.port
+]) and args.certificate is None:
+    print("TLS port requested but no certificate specified.")
+    sys.exit(3)
 
 if not pycurl_available and args.payloader:
         print("Payload analysis requested but no pycurl installed!")
@@ -194,7 +211,9 @@ threads = [
         logger,
         payloader,
         args.server_header,
-        port,
+        int(port.strip("sS")),
+        port.startswith("s") or port.startswith("S"),
+        args.certificate,
         )
     for port in args.port
 ]

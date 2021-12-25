@@ -7,5 +7,7 @@
 --port 8008
 --port 8080
 --port 8081
+--port S8443
 --port 8983
 --port 9200
+--certificate cert.pem
