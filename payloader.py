@@ -8,7 +8,7 @@ from typing import Set, Union, Optional, Dict, BinaryIO
 from urllib.parse import urlparse
 from hashlib import sha256
 from dataclasses import dataclass
-
+from s3 import S3Log
 try:
     import pycurl
 
@@ -32,6 +32,7 @@ class Payloader:
     download_dir: Optional[str] = None,
     upload_container: Optional["azure.storage.blob.ContainerClient"] = None,
     download_timeout: int = 10
+    s3log: Optional[S3Log] = None
 
     def process_payloads(self, parsed_jndi_string: str):
         if not pycurl_available:
@@ -207,6 +208,7 @@ class Payloader:
             dest_name = self.hash_file(f)
         self.copy_to_download(f, dest_name)
         self.upload_file_to_azure_blob(f, dest_name)
+        self.upload_file_to_s3(f, dest_name)
         return dest_name
 
 
@@ -227,3 +229,10 @@ class Payloader:
             blob = self.upload_container.get_blob_client(target_name)
             if not blob.exists():
                 blob.upload_blob(d, length=len(d))
+
+    def upload_file_to_s3(self, f: BinaryIO, target_name: str):
+        """ upload file to S3 bucket """
+        if self.s3log is not None:
+            f.seek(0)
+            d = f.read()
+            self.s3log.log_payload(d, target_name)
