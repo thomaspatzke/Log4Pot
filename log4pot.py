@@ -1,41 +1,19 @@
 # A honeypot for the Log4Shell vulnerability (CVE-2021-44228)
 
 import json
-from pathlib import Path
 import re
 import socket
+import ssl
 import sys
 from argparse import ArgumentParser
 from dataclasses import dataclass
 from datetime import datetime
-from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
-import ssl
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from threading import Thread
 from typing import Any, List, Optional
 from uuid import uuid4
-
-from expression_parser import parse
-from payloader import Payloader, pycurl_available
-from s3 import S3Log
-
-try:
-    from azure.storage.blob import BlobServiceClient
-
-    azure_import = True
-except ImportError:
-    print(
-        "Azure dependencies not installed, logging to blob storage not available.",
-        file=sys.stderr
-    )
-    azure_import = False
-
-try:
-    import boto3
-except ImportError:
-    print(
-        "AWS python dependencies (boto3) not installed, logging to S3 storage not available.",
-        file=sys.stderr
-    )
+from log4pot.expression_parser import parse
 
 re_exploit = re.compile("\${.*}")
 
@@ -127,7 +105,7 @@ class Log4PotHTTPRequestHandler(BaseHTTPRequestHandler):
 
 
 class Log4PotHTTPServer(ThreadingHTTPServer):
-    def __init__(self, logger: Logger, payloader : Payloader, server_header : str, *args, **kwargs):
+    def __init__(self, logger: Logger, payloader : "log4pot.payloader.Payloader", server_header : str, *args, **kwargs):
         self.logger = logger
         self.payloader = payloader
         self.server_header = server_header
@@ -135,7 +113,7 @@ class Log4PotHTTPServer(ThreadingHTTPServer):
 
 
 class Log4PotServerThread(Thread):
-    def __init__(self, logger: Logger, payloader : Payloader, server_header : str, port: int, tls : bool, certificate : Optional[str] = None, *args, **kwargs):
+    def __init__(self, logger: Logger, payloader : "log4pot.payloader.Payloader", server_header : str, port: int, tls : bool, certificate : Optional[str] = None, *args, **kwargs):
         self.port = port
         self.server = Log4PotHTTPServer(
             logger,
@@ -197,12 +175,10 @@ if any([
     print("TLS port requested but no certificate specified.")
     sys.exit(3)
 
-if not pycurl_available and args.payloader:
-        print("Payload analysis requested but no pycurl installed!")
-        sys.exit(2)
-
 if args.blob_connection_string is not None:
-    if not azure_import:
+    try:
+        from azure.storage.blob import BlobServiceClient
+    except ImportError:
         print("Azure logging requested but no azure package installed!")
         sys.exit(2)
     service_client = BlobServiceClient.from_connection_string(args.blob_connection_string)
@@ -215,18 +191,26 @@ else:
     download_container = None
 
 if args.s3_bucket is not None:
-    if not 'boto3' in sys.modules:
+    try:
+        import boto3
+    except ImportError:
         print("S3 logging request but no dependency (boto3) installed! exiting!")
         sys.exit(2)
-    else:
-        s3_client=boto3.client('s3')
-        s3log=S3Log(s3_client, threshold=500, bucket=args.s3_bucket)
+    from log4pot.s3 import S3Log
+
+    s3_client=boto3.client('s3')
+    s3log=S3Log(s3_client, threshold=500, bucket=args.s3_bucket)
 else:
     s3log = None
 
 
 logger = Logger(args.log, log_blob, s3log)
 if args.payloader:
+    try:
+        from log4pot.payloader import Payloader
+    except ImportError as e:
+        print("Payload analysis requested but no pycurl installed or libcurl not available!")
+        sys.exit(2)
     payloader = Payloader(args.download_dir, download_container, args.download_timeout, s3log)
 else:
     payloader = None

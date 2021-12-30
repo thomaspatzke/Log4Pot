@@ -8,16 +8,7 @@ from typing import Set, Union, Optional, Dict, BinaryIO
 from urllib.parse import urlparse
 from hashlib import sha256
 from dataclasses import dataclass
-from s3 import S3Log
-try:
-    import pycurl
-
-    pycurl_available = True
-except ImportError as e:
-    print(
-        f"Pycurl not available or there is an issue with curl dependencies: {e}"
-    )
-    pycurl_available = False
+import pycurl
 
 re_urls = [     # Regular expressions for extraction of URLs from payloads and downloaded samples.
     re.compile(b'\w{3,5}://[^\x00-\x20;"\')\x7b-\xff]+'),                   # URLs prefixed with scheme and :// until first appearance of nonprintable or ending character.
@@ -32,7 +23,7 @@ class Payloader:
     download_dir: Optional[str] = None,
     upload_container: Optional["azure.storage.blob.ContainerClient"] = None,
     download_timeout: int = 10
-    s3log: Optional[S3Log] = None
+    s3log: Optional["log4pot.s3.S3Log"] = None
 
     def process_payloads(self, parsed_jndi_string: str):
         if not pycurl_available:
