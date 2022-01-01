@@ -26,9 +26,6 @@ class Payloader:
     s3log: Optional["log4pot.s3.S3Log"] = None
 
     def process_payloads(self, parsed_jndi_string: str):
-        if not pycurl_available:
-            raise ImportError("Was not able to import pycurl correctly.")
-
         url = self.extract_url(parsed_jndi_string)
         url = urlparse(url)
         data = dict()
