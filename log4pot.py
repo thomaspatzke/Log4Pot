@@ -11,9 +11,10 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
-from typing import Any, List, Optional
+from typing import Any, Callable, List, Optional
 from uuid import uuid4
-from log4pot.expression_parser import parse
+from log4pot.expression_parser import parse as deobfuscate_old
+from log4pot.deobfuscator import deobfuscate as deobfuscate
 
 re_exploit = re.compile("\${.*}")
 
@@ -48,9 +49,15 @@ class Logger:
         self.log("request", "A request was received", correlation_id=str(uuid), server_port=server_port, client=client,
                  port=port, request=request, headers=dict(headers))
 
-    def log_exploit(self, location, payload, uuid):
-        self.log("exploit", "Exploit detected", correlation_id=str(uuid), location=location, payload=payload,
-                 deobfuscated_payload=parse(payload))
+    def log_exploit(self, location, payload, deobfuscated_payload, uuid):
+        self.log(
+            "exploit",
+            "Exploit detected",
+            correlation_id=str(uuid),
+            location=location,
+            payload=payload,
+            deobfuscated_payload=deobfuscated_payload
+            )
 
     def log_payload(self, uuid, **kwargs):
         self.log("payload", "Payload downloaded", correlation_id=str(uuid), **kwargs)
@@ -86,13 +93,13 @@ class Log4PotHTTPRequestHandler(BaseHTTPRequestHandler):
 
     def find_exploit(self, location: str, content: str) -> bool:
         if (m := re_exploit.search(content)):
-            logger.log_exploit(location, m.group(0), self.uuid)
+            exploit = m.group(0)
+            deobfuscated_exploit = self.server.deobfuscator(exploit)
+            logger.log_exploit(location, exploit, deobfuscated_exploit, self.uuid)
 
             if self.server.payloader:
                 try:
-                    data = self.server.payloader.process_payloads(
-                        parse(m.group(0)),
-                    )
+                    data = self.server.payloader.process_payloads(deobfuscated_exploit)
                     self.logger.log_payload(self.uuid, **data)
                 except Exception as e:
                     self.logger.log_exception(e, correlation_id=str(self.uuid))
@@ -105,20 +112,22 @@ class Log4PotHTTPRequestHandler(BaseHTTPRequestHandler):
 
 
 class Log4PotHTTPServer(ThreadingHTTPServer):
-    def __init__(self, logger: Logger, payloader : "log4pot.payloader.Payloader", server_header : str, *args, **kwargs):
+    def __init__(self, logger: Logger, payloader : "log4pot.payloader.Payloader", server_header : str, deobfuscator : Callable[[str], str], *args, **kwargs):
         self.logger = logger
         self.payloader = payloader
         self.server_header = server_header
+        self.deobfuscator = deobfuscator
         super().__init__(*args, **kwargs)
 
 
 class Log4PotServerThread(Thread):
-    def __init__(self, logger: Logger, payloader : "log4pot.payloader.Payloader", server_header : str, port: int, tls : bool, certificate : Optional[str] = None, *args, **kwargs):
+    def __init__(self, logger: Logger, payloader : "log4pot.payloader.Payloader", server_header : str, deobfuscator : Callable[[str], str], port: int, tls : bool, certificate : Optional[str] = None, *args, **kwargs):
         self.port = port
         self.server = Log4PotHTTPServer(
             logger,
             payloader,
             server_header,
+            deobfuscator,
             ("", port),
             Log4PotHTTPRequestHandler,
         )
@@ -157,6 +166,7 @@ argparser.add_argument("--blob-connection-string", "-b", help="Azure blob storag
 argparser.add_argument("--log-container", "-lc", type=str, default="logs", help="Azure blob container for logs.")
 argparser.add_argument("--log-blob", "-lb", default=socket.gethostname() + ".log", help="Azure blob for logs.")
 argparser.add_argument("--server-header", type=str, default=None, help="Replace the default server header.")
+argparser.add_argument("--old-deobfuscator", "-O", action="store_true", help="Deobfuscate payloads with old deobfuscator.")
 argparser.add_argument("--payloader", "-P", action="store_true", help="Download any analyze payloads from exploit attempts.")
 argparser.add_argument("--download-dir", "-dd", type=str, help="Set a download directory for payloader. Only analysis is conducted ")
 argparser.add_argument("--download-container", "-dc", type=str, help="Azure blob container for downloaded payloads.")
@@ -174,6 +184,11 @@ if any([
 ]) and args.certificate is None:
     print("TLS port requested but no certificate specified.")
     sys.exit(3)
+
+if args.old_deobfuscator:
+    deobfuscator = deobfuscate_old
+else:
+    deobfuscator = deobfuscate
 
 if args.blob_connection_string is not None:
     try:
@@ -220,6 +235,7 @@ threads = [
         logger,
         payloader,
         args.server_header,
+        deobfuscator,
         int(port.strip("sS")),
         port.startswith("s") or port.startswith("S"),
         args.certificate,
