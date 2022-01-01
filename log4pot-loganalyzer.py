@@ -4,6 +4,12 @@ from argparse import ArgumentParser
 from pathlib import Path
 from log4pot.loganalyzer import LogAnalyzer, LogParsingError
 from sys import stderr, exit
+import csv
+
+default_csv_param = {
+    "sep": ";",
+    "quoting": csv.QUOTE_ALL,
+}
 
 argparser = ArgumentParser(description="Generate summaries from Log4Pot logs.")
 argparser.add_argument("--output", "-o", type=Path, default=Path("."), help="Output directory for summaries.")
@@ -26,7 +32,7 @@ for logfile in args.logfile:
     else:
         paths.append(logfile)
 
-logs = LogAnalyzer(paths)
+logs = LogAnalyzer(paths, args.keep_deobfuscation, args.old_deobfuscator)
 print(f"Loaded {logs.event_count()} events")
 
 if "all" in summaries or "payloads" in summaries:
@@ -35,6 +41,7 @@ if "all" in summaries or "payloads" in summaries:
         args.output / "payload_summary.csv",
         columns=("first_seen", "last_seen", "payload"),
         index=False,
+        **default_csv_param,
         )
     print(f"Wrote {len(df_payload_summary)} raw payloads.")
 
@@ -44,6 +51,7 @@ if "all" in summaries or "deobfuscated_payloads" in summaries:
         args.output / "deobfuscated_payload_summary.csv",
         columns=("first_seen", "last_seen", "deobfuscated_payload"),
         index=False,
+        **default_csv_param,
         )
     print(f"Wrote {len(df_deobfuscated_payload_summary)} deobfuscated payloads.")
 
@@ -53,5 +61,6 @@ if "all" in summaries or "deobfuscation" in summaries:
         args.output / "deobfuscation_summary.csv",
         columns=("first_seen", "last_seen", "payload", "deobfuscated_payload"),
         index=False,
+        **default_csv_param,
         )
     print(f"Wrote {len(df_deobfuscation_summary)} deobfuscated payloads.")
