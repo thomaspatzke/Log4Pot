@@ -19,7 +19,7 @@ def deobfuscate(expr : str) -> str:
         else:       # Handling of expressions
             try:
                 pos_colon = expr.index(":")
-                lookup_type = expr[2:pos_colon]
+                lookup_type = expr[2:pos_colon].lower()
             except ValueError:      # ${...something without a colon} - return expression
                 return expr
 
@@ -28,8 +28,8 @@ def deobfuscate(expr : str) -> str:
             except ValueError:
                 pos_value = None
 
-            if lookup_type == "jndi":       # JNDI lookup - return as is
-                return expr
+            if lookup_type == "jndi":       # JNDI lookup - return lower cased
+                return "${jndi" + expr[6:]
             elif lookup_type in ("lower", "upper"):    # lower/upper case lookups
                 return expr[pos_colon + 1:pos_end].__getattribute__(lookup_type)() + deobfuscate(expr[pos_end + 1:])
             elif pos_value is not None and pos_value < pos_end:       # ${...:-value} - return value
