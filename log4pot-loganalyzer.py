@@ -8,6 +8,8 @@ from sys import stderr, exit
 argparser = ArgumentParser(description="Generate summaries from Log4Pot logs.")
 argparser.add_argument("--output", "-o", type=Path, default=Path("."), help="Output directory for summaries.")
 argparser.add_argument("--summaries", "-s", default="all", help="Summaries to generate (all, payloads, deobfuscates_payloads, deobfuscation) as comma-separated list")
+argparser.add_argument("--keep-deobfuscation", "-k", action="store_true", help="Keep payload deobfuscation from logs instead of deobfuscate again.")
+argparser.add_argument("--old-deobfuscator", "-O", action="store_true", help="Deobfuscate payloads with old deobfuscator.")
 argparser.add_argument("logfile", nargs="+", type=Path, help="Log4Pot log file or directory containing such files.")
 args = argparser.parse_args()
 

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List
 import pandas as pd
 from log4pot.expression_parser import parse as parse_payload
+from log4pot.deobfuscator import deobfuscate as deobfuscate_payload
 
 @dataclass
 class LogParsingError(Exception):
@@ -19,12 +20,19 @@ class LogParsingError(Exception):
 @dataclass
 class LogAnalyzer:
     logfiles : List[Path]
+    keep_deobfuscation : bool = False
+    old_deobfuscator : bool = False
 
     def __post_init__(self):
         self.logfiles = [
             Path(logfile)
             for logfile in self.logfiles
         ]
+        if self.old_deobfuscator:
+            self.deobfuscate = parse_payload
+        else:
+            self.deobfuscate = deobfuscate_payload
+
         self.load_logs()
 
     def load_logs(self):
@@ -54,8 +62,8 @@ class LogAnalyzer:
                 except KeyError as e:
                     raise LogParsingError(logname, i, "Timestamp missing", e)
 
-                if "payload" in parsed_event and "deobfuscated_payload" not in parsed_event:
-                    parsed_event["deobfuscated_payload"] = parse_payload(parsed_event["payload"])
+                if "payload" in parsed_event and ("deobfuscated_payload" not in parsed_event or not self.keep_deobfuscation):
+                    parsed_event["deobfuscated_payload"] = self.deobfuscate(parsed_event["payload"])
 
                 parsed_events.append(parsed_event)
 
