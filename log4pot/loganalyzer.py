@@ -104,7 +104,7 @@ class LogAnalyzer:
 
     def deobfuscation_summary(self):
         df = self.df_payloads()
-        return df.groupby([ "payload", "deobfuscated_payload" ]).agg(
+        return df.groupby([ "deobfuscated_payload", "payload" ]).agg(
             first_seen=pd.NamedAgg(column="timestamp", aggfunc="min"),
             last_seen=pd.NamedAgg(column="timestamp", aggfunc="max"),
         ).sort_values(by="first_seen")

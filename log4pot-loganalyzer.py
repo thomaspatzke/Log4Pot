@@ -63,4 +63,4 @@ if "all" in summaries or "deobfuscation" in summaries:
         index=False,
         **default_csv_param,
         )
-    print(f"Wrote {len(df_deobfuscation_summary)} deobfuscated payloads.")
+    print(f"Wrote deobfuscation_summary with {len(df_deobfuscation_summary)} items.")
