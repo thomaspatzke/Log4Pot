@@ -80,9 +80,9 @@ class Log4PotHTTPRequestHandler(BaseHTTPRequestHandler):
             self.version_string = lambda: self.server.server_header
         self.uuid = uuid4()
         self.send_response(200)
-        self.send_header("Content-Type", "text/json")
+        self.send_header("Content-Type", self.server.content_type)
         self.end_headers()
-        self.wfile.write(bytes(f'{{ "status": "ok", "id": "{self.uuid}" }}', "utf-8"))
+        self.wfile.write(self.server.response)
 
         self.logger = self.server.logger
         self.logger.log_request(self.server.server_address[1], *self.client_address, self.requestline, self.headers,
@@ -112,21 +112,44 @@ class Log4PotHTTPRequestHandler(BaseHTTPRequestHandler):
 
 
 class Log4PotHTTPServer(ThreadingHTTPServer):
-    def __init__(self, logger: Logger, payloader : "log4pot.payloader.Payloader", server_header : str, deobfuscator : Callable[[str], str], *args, **kwargs):
+    def __init__(
+        self,
+        logger: Logger,
+        payloader : "log4pot.payloader.Payloader",
+        server_header : str,
+        response : bytes,
+        content_type : str,
+        deobfuscator : Callable[[str], str],
+        *args, **kwargs):
         self.logger = logger
         self.payloader = payloader
         self.server_header = server_header
+        self.response = response
+        self.content_type = content_type
         self.deobfuscator = deobfuscator
         super().__init__(*args, **kwargs)
 
 
 class Log4PotServerThread(Thread):
-    def __init__(self, logger: Logger, payloader : "log4pot.payloader.Payloader", server_header : str, deobfuscator : Callable[[str], str], port: int, tls : bool, certificate : Optional[str] = None, *args, **kwargs):
+    def __init__(
+        self,
+        logger: Logger,
+        payloader : "log4pot.payloader.Payloader",
+        server_header : str,
+        response : bytes,
+        content_type : str,
+        deobfuscator : Callable[[str], str],
+        port: int,
+        tls : bool,
+        certificate : Optional[str] = None,
+        *args, **kwargs):
         self.port = port
         self.server = Log4PotHTTPServer(
             logger,
             payloader,
             server_header,
+            response,
+            content_type,
             deobfuscator,
             ("", port),
             Log4PotHTTPRequestHandler,
@@ -161,6 +184,8 @@ argparser = Log4PotArgumentParser(
 )
 argparser.add_argument("--port", "-p", action="append", type=str, help="Listening port. Prepend with 'S' to configure as TLS secured port. Certificate is configured with --certificate.")
 argparser.add_argument("--certificate", "-c", type=str, help="Certificate used for TLS.")
+argparser.add_argument("--response", "-r", type=str, default="responses/default.json", help="File used as response. Default: %(default)s")
+argparser.add_argument("--content-type", "-t", type=str, default="text/json", help="Content type of response. Default: %(default)s")
 argparser.add_argument("--log", "-l", type=str, default="log4pot.log", help="Log file")
 argparser.add_argument("--blob-connection-string", "-b", help="Azure blob storage connection string.")
 argparser.add_argument("--log-container", "-lc", type=str, default="logs", help="Azure blob container for logs.")
@@ -230,11 +255,20 @@ if args.payloader:
 else:
     payloader = None
 
+try:
+    with open(args.response, "rb") as f:
+        response = f.read()
+except OSError as e:
+    print(f"Error while loading response file {args.response}: {str(e)}")
+    sys.exit(4)
+
 threads = [
     Log4PotServerThread(
         logger,
         payloader,
         args.server_header,
+        response,
+        args.content_type,
         deobfuscator,
         int(port.strip("sS")),
         port.startswith("s") or port.startswith("S"),

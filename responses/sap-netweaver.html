@@ -1,0 +1,335 @@
+<html><head>
+<script type="text/javascript">
+/*HTML Business for Java, 6.0*/
+ur_system = {doc : window.document , mimepath :"/com.sap.portal.design.urdesigndata/themes/portal/foobar_small/common/", stylepath : "/com.sap.portal.design.urdesigndata/themes/portal/foobar_small/ur/", is508 : false, domainrelaxing : "MINIMAL"};
+var popup_emptydoc = "/htmlb/jslib/emptyhover.html";</script>
+<link rel="stylesheet" href="/com.sap.portal.design.portaldesigndata/themes/portal/foobar_small/prtl_std/prtl_std_nn7.css?v=7.31.16.0.1" />
+
+<!-- EPCF: BOB Core -->
+<meta http-equiv="content-script-type" content="text/javascript"/>
+<script type="text/javascript" src="/com.sap.portal.epcf.loader/script/optimize/js13_epcf.js?7.311600024"></script>
+<script type="text/javascript">
+<!--
+EPCM.relaxDocumentDomain();
+EPCM.init( {
+Version:7.311600024,
+Level:1,
+DynamicTop:false, // [service=true nestedWinOnAlias=false]
+UAType:21, // [Mozilla]
+UAVersion:5.0,
+UAPlatform:1, // [Win]
+UIPMode:"1", // [Default=1, User=0, Personalize=true]
+UIPWinFeatures:"",
+UIPPortalPath:"http://164.3.71.56:80/irj/portal",
+UIPPopupComp:"http://164.3.71.56:80/irj/servlet/prt/portal/prtroot/com.sap.portal.epcf.admin.WorkProtectPopup",
+UIPPopupCompSize:"dialogWidth:450px; dialogHeight:200px; status:no",
+UIPPopupMsgNN:"Ihre\x20aktuelle\x20Seite\x20enth\xe4lt\x20ungesicherte\x20Daten.\r\nM\xf6chten\x20Sie\x20mit\x20der\x20Navigation\x20fortfahren\x20und\x20ein\x20neues\x20Fenster\x20\xf6ffnen\x3f",
+UIPPopupMsgND:"Ihre\x20aktuelle\x20Seite\x20enth\xe4lt\x20ungesicherte\x20Daten.\r\nM\xf6chten\x20Sie\x20die\x20\xc4nderungen\x20verwerfen\x20und\x20den\x20Content\x20im\x20gleichen\x20Fenster\x20\xf6ffnen\x3f",
+DBGException:false,
+DBCookie:false
+} );
+EPCM.DSM.init( {
+TerminatorURL:"/irj/servlet/prt/portal/prtroot/com.sap.portal.dsm.Terminator",
+WinEmptyUrl:"/com.sap.portal.dsm/images/empty.gif",
+NavAcrossSubFramesUrl:"disabled",
+ForcedUserDebug:false,
+KeepAliveActive:false,
+KeepAliveDelta:840,
+dsmMethodGetKey:"",
+KeepAliveStopAfter:36000
+} );
+function SAPWP_receiveSessInfo( sessInfo, frameRef ){
+  EPCM.DSM.processSession( sessInfo, frameRef );
+}
+//-->
+</script>
+<!-- EPCF: EOB Core -->
+<title>SAP&#x20;NetWeaver&#x20;Portal</title><meta HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8"><link  REL=STYLESHEET  HREF="/com.sap.portal.design.urdesigndata/themes/portal/foobar_small/ur/ur_nn7.css?rid=2e32ad6437d6823c2494a14fc0971042&v=10.30.1.236206.1"  TYPE="text/css" ></head><body class="prtlBody urFontBaseFam urScrl">
+<!-- EPCF: Component com.sap.portal.runtime.logon.certlogon, mjbamdighgbaimcjfphemjhodmcggohh -->
+<script>
+  var inPortalScript = true
+  var webpath = "/logon_ui_resources/"
+</script>
+
+<link rel=stylesheet href="/logon_ui_resources/css/ur/ur_nn6.css">
+<script language="javascript">
+var originWindowName=window.name;
+window.name="logonAppPage";
+function restoreWindow() {
+try{
+window.name=originWindowName;
+} catch(ex){}
+}
+</script>
+<script language="JavaScript">
+function putFocus(formInst, elementInst) {
+  if (document.forms.length > 0) {
+    document.forms[formInst].elements[elementInst].focus();
+  }
+}
+
+function setValuesAutoCreation() {
+var form = document.getElementById('logonForm');
+form.j_username.value="";
+form.j_password.value="";
+form.automaticAccountCreation.value="true";
+}
+function submitForm() {
+var form = document.getElementById('logonForm');
+form.submit();
+}
+function clearEntries() {
+  document.logonForm.longUid.value="";
+  document.logonForm.password.value="";
+}
+function setFocusToFirstField() {
+ myform = document.logonForm;
+ try{
+   for (i=0; i<myform.length; i++) {
+    elem = myform.elements[i];
+    if (!elem.disabled) {
+      elemType = elem.type;
+      if (elemType=="text" || elemType=="password") {
+       if (!elem.readOnly) {
+          elem.focus();
+          break;
+       }
+      }
+      if (elemType=="select-one" || elemType=="select-multiple" || elemType=="checkbox" || elemType=="radio") {
+        elem.focus();
+        break;
+      }
+    }
+   }
+ } catch(ex){
+ }
+}
+function addTenantPrefix() {
+  return true;
+}
+</script>
+<span id="UMELogon">
+<script language="JavaScript">
+if( window.EPCM != null ) {
+  EPCM.subscribeEvent( "urn:com.sapportals.portal:browser", "load", setFocusToFirstField );
+}
+</script>
+
+
+
+
+
+
+
+
+
+<script language="JavaScript">
+var blockPage = false;
+</script>
+
+
+
+<script language="JavaScript">
+function writeMessage() {
+	document.write("<h2>An unexpected problem has occurred. Please contact your system administrator and show them this message.</h2>");
+}
+
+if (blockPage) {
+	writeMessage();
+
+	// According to the tests:
+	// IE works with document.execCommand() and throws exception if window.stop() is used
+	// Firefox and Chrome work only with window.stop() but do not throw exception if document.execCommand() is used.
+
+	// For IE 11 the appName object below no longer contains Explorer as the previous versions did. So the following solution no longer works for IE11:
+	//var browserName = navigator.appName;
+	//if (browserName.indexOf("Explorer") > -1) {
+	//	writeMessage();
+	//	document.execCommand("Stop");
+	//} else {
+	//	writeMessage();
+	//	window.stop();
+	//}
+
+	// Detecting the browser based on appName or another navigator object is not very trustworthy and future proof. Hopefully a longer lasting solution is:
+	try {
+		window.stop();
+		//document.write("<h2>window.stop() success!</h2>"); //Actually this line could never be printed as FF and Chrome will stop on previous line
+	} catch (error) {
+		//document.write("<h2>window.stop() did not work. Exception is: "+error+".</h2>");
+		try {
+			document.execCommand("Stop");
+			//document.write("<h2>document.execCommand(\"Stop\") success!</h2>"); // This would be printed in case of IE
+		} catch (error) {
+			//document.write("<h2>document.execCommand(\"Stop\") did not work. Exception is: "+error+".</h2>");
+			document.write("<h2>This browser cannot prevent the Logon Page frame from loading!<br>Do not submit your credentials and contact your system administrator!</h2>");
+		}
+	}
+}
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table id="tblFrmUI" width="790px" valign="middle" dir="ltr" align="center" cellPadding="0" cellSpacing="0" style="background-color:#ffffff;margin-top:50px;">
+
+	<tr>
+		<td><img src="/logon_ui_resources/layout/lf_tl.png" width="29" height="32"></td>
+		<td background="/logon_ui_resources/layout/lf_st.png"></td>
+		<td><img src="/logon_ui_resources/layout/lf_tr.png" width="27" height="32"></td>
+	</tr>
+
+	<tr>
+
+		<td background="/logon_ui_resources/layout/lf_sl.png"></td>
+
+		<td width="100%">
+
+      <table id="tblInnerCnt" dir="ltr" cellpadding="0" cellspacing="0">
+
+				<tr>
+					<td valign="top"><div class="urBrandImage"><img src="/logon_ui_resources/layout/branding-image.jpg" alt="Branding Image" border="0"></div></td>
+					<td width="100%"></td>
+					<td>
+					 <table height="360px" cellPadding="0" cellSpacing="0">
+							<tr>
+								<td valign="top"><div class="urProductName"><img src="/logon_ui_resources/layout/branding-text.gif" alt="" border="0"></div></td>
+							</tr>
+							<tr>
+								<td valign="top" align="left">
+										<div class="urLogonData">
+											<!-- data table starts after this line -->
+											<FORM  AUTOCOMPLETE="off"  id="logonForm" name="logonForm" target="logonAppPage" method="post" action="" >
+<input name="login_submit" type="hidden" value="on"><input type="hidden" name="login_do_redirect" value="1" /><input name="no_cert_storing" type="hidden" value="on"><input type="hidden" name="j_salt" value="G8A3dQyxDn6lPZyFErkjHVOr8zI=" />
+
+
+											<table class="urLogonTable" cellSpacing="3px" cellPadding="0" valign="top">
+												<tr><td colspan="3">
+													<div class="urMessageArea">
+														<!--	Federation Error Message				-->
+
+
+													</div>
+												</td></tr>
+
+												<!-- userid -->
+												<tr><td>
+													<label class="urLblStdNew"><nobr>Benutzer<span class=urLblReq>&nbsp;*</span></nobr></label>
+
+												</td>
+												<td>
+													<input type="text" id="logonuidfield"  name="j_username" value="" title="Benutzer *" class="urEdfTxtEnbl" style="width:170px">
+												</td>
+												<td width="100%">&nbsp;</td></tr>
+												<!-- password -->
+												<tr><td>
+													<label class="urLblStdNew" for="logonpassfield"><nobr>Kennwort<span class=urLblReq>&nbsp;*</span></nobr></label>
+
+												</td>
+												<td>
+													<input type="password" id="logonpassfield"  name="j_password" class="urEdfTxtEnbl" style="width:170px">
+												</td>
+												<td>&nbsp;</td></tr>
+												<!-- create certificate -->
+
+												<!-- Federate User checkbox -->
+
+												<tr><td width="100%" colspan="3">&nbsp;</td></tr>
+												<tr><td>&nbsp;
+												</td><td align="right">
+													<!-- logon button -->
+													<input class="urBtnStdNew" type="submit" name="uidPasswordLogon" value="Anmelden" >
+
+
+												</td>
+												<td>&nbsp;</td></tr>
+												<!-- link to certificate logon -->
+
+												<!-- logon help -->
+
+											</table>
+											</form>
+
+										<!-- data table ends before this line -->
+										</div>
+								</td>
+							</tr>
+							<tr>
+								<td valign="bottom">
+									<div class="urCopyrightFrame">
+										<div class="urCopyrightText">Copyright &copy; SAP AG. Alle Rechte vorbehalten.</div>
+										<div class="urCopyrightImage"><img src="/logon_ui_resources/layout/sap_logo.png" alt="SAP AG" title="SAP AG" width="55" height="27"></div>
+									</div>
+								</td>
+							</tr>
+						</table>
+					</td>
+				</tr>
+			</table>
+		</td>
+
+		<td background="/logon_ui_resources/layout/lf_sr.png"></td>
+
+	</tr>
+
+	<tr>
+		<td><img src="/logon_ui_resources/layout/lf_bl.png" width="29" height="32"></td>
+		<td align="center" background="/logon_ui_resources/layout/lf_sb.png"><span class="clip"><img src="/logon_ui_resources/layout/lf_clip.png" width="298" height="32"></span></td>
+		<td><img src="/logon_ui_resources/layout/lf_br.png" width="27" height="32"></td>
+	</tr>
+
+</table>
+
+
+<script type="text/javascript">
+<!--
+  var docDir = document.dir;
+  if(docDir=="rtl" || docDir=="RTL"){
+     var elTableCnt = document.getElementById("tblInnerCnt");
+     if(elTableCnt!=undefined){
+       elTableCnt.style.direction="rtl";
+     }
+  }
+  var isFormSubmitted = false;
+  if( document.forms ) {
+    document.forms[0].onsubmit=function(){
+      if( isFormSubmitted ) {
+        return false;
+      } else {
+        isFormSubmitted = true;
+        return true;
+      }
+    }
+  }
+-->
+</script>
+
+<script type="text/javascript">
+//juqery user screen size fix for iphone
+/**
+$(document).ready( function() {
+	//Maximize the real estate available to the portal contents
+	stretch_portal_content();
+	$(window).resize( stretch_portal_content );
+});
+
+function stretch_portal_content() {
+	if( $(window).height() > $('body').height() ) {
+		$( '#portal-content' ).height(
+			$(window).height() - ( $('body').height() - $('#portal-content').height() )
+		);
+	}
+}
+**/
+</script>
+</span>
+<SCRIPT>var hash = document.location.hash;if (hash && hash !='#'){ var forms = document.getElementsByTagName('FORM'); for (var i = 0; i < forms.length; i++) {      var form = forms[i];     var currentElement = document.createElement('input');     currentElement.setAttribute('type', 'hidden');     currentElement.setAttribute('name', 'postAnchorString');     currentElement.setAttribute('id', 'postAnchorString');     currentElement.setAttribute('value', hash);     form.appendChild(currentElement);     }}</SCRIPT></body></html>
