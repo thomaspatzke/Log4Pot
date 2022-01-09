@@ -171,7 +171,7 @@ argparser.add_argument("--payloader", "-P", action="store_true", help="Download 
 argparser.add_argument("--download-dir", "-dd", type=str, help="Set a download directory for payloader. Only analysis is conducted ")
 argparser.add_argument("--download-container", "-dc", type=str, help="Azure blob container for downloaded payloads.")
 argparser.add_argument("--download-timeout", "-dt", type=int, default=10, help="Set download timeout for payloads.")
-argparser.add_argument("--s3_bucket", type=str, help="S3 bucket to upload logs to")
+argparser.add_argument("--s3-bucket", type=str, help="S3 bucket to upload logs to")
 
 args = argparser.parse_args()
 if args.port is None:
