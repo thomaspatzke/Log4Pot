@@ -34,6 +34,14 @@ To redirect traffic to port 80 and 443 to Log4Pot, use following iptables comman
 
 `iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 443 -j REDIRECT --to-port 8443`
 
+## Log Analysis Tool
+
+The script `log4pot-loganalyzer.py` extracts all payloads, decodes them with the current decoder and builds a timeline from both. Use is as follows:
+
+```
+python log4pot-loganalyzer.py -o <output directory> <input log files>
+```
+
 ## Analyzing Logs with JQ
 
 List payloads from exploitation attempts:
@@ -44,4 +52,9 @@ select(.type == "exploit") | .payload
 Decode all base64-encoded payloads from JNDI exploit:
 ```
 select(.type == "exploit" and (.payload | contains("Base64"))) | .payload | sub(".*/Base64/"; "") | sub ("}$"; "") | @base64d
+```
+
+Extract all SHA256 hashes from files downloaded from URLs:
+```
+[ .[] | select(.type == "payload") | .urls | select((. | length) > 0) | to_entries | .[].value | select((. | length) == 64) ] | unique | .[]
 ```
