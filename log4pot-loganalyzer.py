@@ -1,6 +1,7 @@
 # Generate summaries from Log4Pot logs
 
 from argparse import ArgumentParser
+import argparse
 from pathlib import Path
 from log4pot.loganalyzer import LogAnalyzer, LogParsingError
 from sys import stderr, exit
@@ -13,13 +14,25 @@ default_csv_param = {
 
 argparser = ArgumentParser(description="Generate summaries from Log4Pot logs.")
 argparser.add_argument("--output", "-o", type=Path, default=Path("."), help="Output directory for summaries.")
-argparser.add_argument("--summaries", "-s", default="all", help="Summaries to generate (all, payloads, deobfuscates_payloads, deobfuscation) as comma-separated list")
+argparser.add_argument("--summaries", "-s", default="all", help="Summaries to generate (all, exploits, deobfuscates_exploits, deobfuscation, payload_urls) as comma-separated list")
 argparser.add_argument("--keep-deobfuscation", "-k", action="store_true", help="Keep payload deobfuscation from logs instead of deobfuscate again.")
 argparser.add_argument("--old-deobfuscator", "-O", action="store_true", help="Deobfuscate payloads with old deobfuscator.")
+argparser.add_argument("--url-allowlist", "-ua", default="default-url-allowlist", type=argparse.FileType("r"), help="URL pattern allowlist to use for payload_url summary.")
+argparser.add_argument("--url-denylist", "-ud", default="default-url-denylist", type=argparse.FileType("r"), help="URL pattern denylist to use for payload_url summary.")
 argparser.add_argument("logfile", nargs="+", type=Path, help="Log4Pot log file or directory containing such files.")
 args = argparser.parse_args()
 
 summaries = frozenset(args.summaries.split(","))
+url_allowlist = [
+    line.strip()
+    for line in args.url_allowlist.readlines()
+]
+args.url_allowlist.close()
+url_denylist = [
+    line.strip()
+    for line in args.url_denylist.readlines()
+]
+args.url_denylist.close()
 
 paths = list()
 for logfile in args.logfile:
@@ -35,25 +48,25 @@ for logfile in args.logfile:
 logs = LogAnalyzer(paths, args.keep_deobfuscation, args.old_deobfuscator)
 print(f"Loaded {logs.event_count()} events")
 
-if "all" in summaries or "payloads" in summaries:
-    df_payload_summary = logs.payload_summary()
+if "all" in summaries or "exploits" in summaries:
+    df_payload_summary = logs.exploit_summary()
     df_payload_summary.reset_index().to_csv(
-        args.output / "payload_summary.csv",
+        args.output / "epxloit_summary.csv",
         columns=("first_seen", "last_seen", "payload"),
         index=False,
         **default_csv_param,
         )
-    print(f"Wrote {len(df_payload_summary)} raw payloads.")
+    print(f"Wrote {len(df_payload_summary)} raw exploits.")
 
-if "all" in summaries or "deobfuscated_payloads" in summaries:
-    df_deobfuscated_payload_summary = logs.deobfuscated_payload_summary()
+if "all" in summaries or "deobfuscated_exploits" in summaries:
+    df_deobfuscated_payload_summary = logs.deobfuscated_exploit_summary()
     df_deobfuscated_payload_summary.reset_index().to_csv(
-        args.output / "deobfuscated_payload_summary.csv",
+        args.output / "deobfuscated_exploit_summary.csv",
         columns=("first_seen", "last_seen", "deobfuscated_payload"),
         index=False,
         **default_csv_param,
         )
-    print(f"Wrote {len(df_deobfuscated_payload_summary)} deobfuscated payloads.")
+    print(f"Wrote {len(df_deobfuscated_payload_summary)} deobfuscated exploits.")
 
 if "all" in summaries or "deobfuscation" in summaries:
     df_deobfuscation_summary = logs.deobfuscation_summary()
@@ -64,3 +77,13 @@ if "all" in summaries or "deobfuscation" in summaries:
         **default_csv_param,
         )
     print(f"Wrote deobfuscation_summary with {len(df_deobfuscation_summary)} items.")
+
+if "all" in summaries or "payload_urls" in summaries:
+    df = logs.payload_url_summary(url_allowlist, url_denylist)
+    df.reset_index().to_csv(
+        args.output / "payload_urls.csv",
+        columns=("first_seen", "last_seen", "url"),
+        index=False,
+        **default_csv_param,
+        )
+    print(f"Wrote {len(df)} payload URLs.")

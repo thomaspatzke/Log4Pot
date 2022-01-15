@@ -3,6 +3,7 @@ from datetime import datetime
 import json
 from pathlib import Path
 from typing import Dict, Iterable, List
+from numpy import False_
 import pandas as pd
 from log4pot.expression_parser import parse as parse_payload
 from log4pot.deobfuscator import deobfuscate as deobfuscate_payload
@@ -82,29 +83,58 @@ class LogAnalyzer:
             self.events
         )
 
-    def df_payloads(self) -> pd.DataFrame:
+    def df_exploits(self) -> pd.DataFrame:
         return pd.DataFrame(
             self.filter_event_type("exploit"),
             columns=["timestamp", "payload", "deobfuscated_payload"],
             )
 
-    def payload_summary(self):
-        df = self.df_payloads()
+    def df_payloads(self) -> pd.DataFrame:
+        return pd.DataFrame(
+            (
+                {
+                    **event,
+                    "url": event.get("urls", dict()).keys(),
+                    "sha256": event.get("urls", dict()).values(),
+                }
+                for event in self.filter_event_type("payload")
+            ),
+            columns=["timestamp", "javaCodeBase", "javaSerializedData", "url", "sha256"],
+        ).explode(["url", "sha256"])
+
+    def exploit_summary(self):
+        df = self.df_exploits()
         return df.groupby("payload").agg(
             first_seen=pd.NamedAgg(column="timestamp", aggfunc="min"),
             last_seen=pd.NamedAgg(column="timestamp", aggfunc="max"),
         ).sort_values(by="first_seen")
 
-    def deobfuscated_payload_summary(self):
-        df = self.df_payloads()
+    def deobfuscated_exploit_summary(self):
+        df = self.df_exploits()
         return df.groupby("deobfuscated_payload").agg(
             first_seen=pd.NamedAgg(column="timestamp", aggfunc="min"),
             last_seen=pd.NamedAgg(column="timestamp", aggfunc="max"),
         ).sort_values(by="first_seen")
 
     def deobfuscation_summary(self):
-        df = self.df_payloads()
+        df = self.df_exploits()
         return df.groupby([ "deobfuscated_payload", "payload" ]).agg(
+            first_seen=pd.NamedAgg(column="timestamp", aggfunc="min"),
+            last_seen=pd.NamedAgg(column="timestamp", aggfunc="max"),
+        ).sort_values(by="first_seen")
+
+    def payload_url_summary(self, allowlist = [], denylist = []):
+        df = self.df_payloads()
+        df["url"] = df[["javaCodeBase", "url"]].values.tolist()
+        df = df[["timestamp", "url"]].explode("url")
+        df = df[~df["url"].isnull()]
+        df["url"] = df["url"].apply(lambda url: url if "://" in url else "http://" + url)
+        for pattern in allowlist:
+            df = df[df["url"].str.match(pattern, False)]
+        for pattern in denylist:
+            df = df[~df["url"].str.match(pattern, False)]
+
+        return df.groupby("url").agg(
             first_seen=pd.NamedAgg(column="timestamp", aggfunc="min"),
             last_seen=pd.NamedAgg(column="timestamp", aggfunc="max"),
         ).sort_values(by="first_seen")
