@@ -19,7 +19,7 @@ class LogParsingError(Exception):
 
 @dataclass
 class LogAnalyzer:
-    logs : List[List[str]]
+    logs : List[str]
     keep_deobfuscation : bool = False
     old_deobfuscator : bool = False
 
@@ -45,7 +45,7 @@ class LogAnalyzer:
         for log in self.logs:
             lognum += 1
             linenum = 1
-            for line in log:
+            for line in log.splitlines():
                 try:
                     parsed_event : dict = json.loads(line)
                 except Exception as e:

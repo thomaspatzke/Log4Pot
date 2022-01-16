@@ -46,7 +46,7 @@ for logfile in args.logfile:
         paths.append(logfile)
 
 logs = [
-    path.open("r").readlines()
+    path.open("r").read()
     for path in paths
 ]
 
