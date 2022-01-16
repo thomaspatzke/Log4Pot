@@ -45,11 +45,16 @@ for logfile in args.logfile:
     else:
         paths.append(logfile)
 
-logs = LogAnalyzer(paths, args.keep_deobfuscation, args.old_deobfuscator)
-print(f"Loaded {logs.event_count()} events")
+logs = [
+    path.open("r").readlines()
+    for path in paths
+]
+
+loganalyzer = LogAnalyzer(logs, args.keep_deobfuscation, args.old_deobfuscator)
+print(f"Loaded {loganalyzer.event_count()} events")
 
 if "all" in summaries or "exploits" in summaries:
-    df_payload_summary = logs.exploit_summary()
+    df_payload_summary = loganalyzer.exploit_summary()
     df_payload_summary.reset_index().to_csv(
         args.output / "epxloit_summary.csv",
         columns=("first_seen", "last_seen", "payload"),
@@ -59,7 +64,7 @@ if "all" in summaries or "exploits" in summaries:
     print(f"Wrote {len(df_payload_summary)} raw exploits.")
 
 if "all" in summaries or "deobfuscated_exploits" in summaries:
-    df_deobfuscated_payload_summary = logs.deobfuscated_exploit_summary()
+    df_deobfuscated_payload_summary = loganalyzer.deobfuscated_exploit_summary()
     df_deobfuscated_payload_summary.reset_index().to_csv(
         args.output / "deobfuscated_exploit_summary.csv",
         columns=("first_seen", "last_seen", "deobfuscated_payload"),
@@ -69,7 +74,7 @@ if "all" in summaries or "deobfuscated_exploits" in summaries:
     print(f"Wrote {len(df_deobfuscated_payload_summary)} deobfuscated exploits.")
 
 if "all" in summaries or "deobfuscation" in summaries:
-    df_deobfuscation_summary = logs.deobfuscation_summary()
+    df_deobfuscation_summary = loganalyzer.deobfuscation_summary()
     df_deobfuscation_summary.reset_index().to_csv(
         args.output / "deobfuscation_summary.csv",
         columns=("first_seen", "last_seen", "payload", "deobfuscated_payload"),
@@ -79,7 +84,7 @@ if "all" in summaries or "deobfuscation" in summaries:
     print(f"Wrote deobfuscation_summary with {len(df_deobfuscation_summary)} items.")
 
 if "all" in summaries or "payload_urls" in summaries:
-    df = logs.payload_url_summary(url_allowlist, url_denylist)
+    df = loganalyzer.payload_url_summary(url_allowlist, url_denylist)
     df.reset_index().to_csv(
         args.output / "payload_urls.csv",
         columns=("first_seen", "last_seen", "url"),

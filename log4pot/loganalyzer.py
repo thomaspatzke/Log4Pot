@@ -1,9 +1,8 @@
+from ast import Call
 from dataclasses import dataclass
 from datetime import datetime
 import json
-from pathlib import Path
-from typing import Dict, Iterable, List
-from numpy import False_
+from typing import Callable, Dict, Iterable, List
 import pandas as pd
 from log4pot.expression_parser import parse as parse_payload
 from log4pot.deobfuscator import deobfuscate as deobfuscate_payload
@@ -20,51 +19,45 @@ class LogParsingError(Exception):
 
 @dataclass
 class LogAnalyzer:
-    logfiles : List[Path]
+    logs : List[List[str]]
     keep_deobfuscation : bool = False
     old_deobfuscator : bool = False
 
     def __post_init__(self):
-        self.logfiles = [
-            Path(logfile)
-            for logfile in self.logfiles
-        ]
         if self.old_deobfuscator:
-            self.deobfuscate = parse_payload
+            deobfuscator = parse_payload
         else:
-            self.deobfuscate = deobfuscate_payload
+            deobfuscator = deobfuscate_payload
+        self.load_logs(deobfuscator)
 
-        self.load_logs()
-
-    def load_logs(self):
+    def load_logs(self, deobfuscator : Callable[[str], str]):
         """
-        Load log files specified while initialization into events element. Additionally:
+        Parse logs specified while initialization into events element. Additionally:
 
         * Converts timestamps into datetime objects.
         * Sorts log events by timestamp.
-        * Adds source file name to each log event.
         * Deobfuscate payload in cases where this wasn't done (logs from older Log4Pot versions)
 
         This is invoked at initialization and usually must not be called again.
         """
         parsed_events = list()
-        for logfile in self.logfiles:
-            f = logfile.open("r")
-            logname = logfile.name
-            i = 1
-            for event in f.readlines():
+        lognum = 0
+        for log in self.logs:
+            lognum += 1
+            linenum = 1
+            for line in log:
                 try:
-                    parsed_event : dict = json.loads(event)
+                    parsed_event : dict = json.loads(line)
                 except Exception as e:
-                    raise LogParsingError(logname, i, "JSON parsing", e)
+                    raise LogParsingError(lognum, linenum, "JSON parsing", e)
 
                 try:
                     parsed_event["timestamp"] = datetime.fromisoformat(parsed_event["timestamp"])
                 except KeyError as e:
-                    raise LogParsingError(logname, i, "Timestamp missing", e)
+                    raise LogParsingError(lognum, linenum, "Timestamp missing", e)
 
                 if "payload" in parsed_event and ("deobfuscated_payload" not in parsed_event or not self.keep_deobfuscation):
-                    parsed_event["deobfuscated_payload"] = self.deobfuscate(parsed_event["payload"])
+                    parsed_event["deobfuscated_payload"] = deobfuscator(parsed_event["payload"])
 
                 parsed_events.append(parsed_event)
 
