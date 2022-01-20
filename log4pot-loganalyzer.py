@@ -14,7 +14,7 @@ default_csv_param = {
 
 argparser = ArgumentParser(description="Generate summaries from Log4Pot logs.")
 argparser.add_argument("--output", "-o", type=Path, default=Path("."), help="Output directory for summaries.")
-argparser.add_argument("--summaries", "-s", default="all", help="Summaries to generate (all, exploits, deobfuscates_exploits, deobfuscation, payload_urls) as comma-separated list")
+argparser.add_argument("--summaries", "-s", default="all", help="Summaries to generate (all, exploits, deobfuscates_exploits, deobfuscation, payload_urls, callback_urls, callback_full_urls) as comma-separated list")
 argparser.add_argument("--keep-deobfuscation", "-k", action="store_true", help="Keep payload deobfuscation from logs instead of deobfuscate again.")
 argparser.add_argument("--old-deobfuscator", "-O", action="store_true", help="Deobfuscate payloads with old deobfuscator.")
 argparser.add_argument("--url-allowlist", "-ua", default="default-url-allowlist", type=argparse.FileType("r"), help="URL pattern allowlist to use for payload_url summary.")
@@ -92,3 +92,23 @@ if "all" in summaries or "payload_urls" in summaries:
         **default_csv_param,
         )
     print(f"Wrote {len(df)} payload URLs.")
+
+if "all" in summaries or "callback_urls" in summaries:
+    df = loganalyzer.callback_url_summary()
+    df.reset_index().to_csv(
+        args.output / "callback_urls.csv",
+        columns=("first_seen", "last_seen", "url"),
+        index=False,
+        **default_csv_param,
+        )
+    print(f"Wrote {len(df)} callback URLs.")
+
+if "all" in summaries or "callback_full_urls" in summaries:
+    df = loganalyzer.callback_full_url_summary()
+    df.reset_index().to_csv(
+        args.output / "callback_full_urls.csv",
+        columns=("first_seen", "last_seen", "url"),
+        index=False,
+        **default_csv_param,
+        )
+    print(f"Wrote {len(df)} full callback URLs.")

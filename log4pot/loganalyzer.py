@@ -131,3 +131,21 @@ class LogAnalyzer:
             first_seen=pd.NamedAgg(column="timestamp", aggfunc="min"),
             last_seen=pd.NamedAgg(column="timestamp", aggfunc="max"),
         ).sort_values(by="first_seen")
+
+    def callback_url_summary(self):
+        df = self.df_exploits()
+        df["url"] = df["deobfuscated_payload"].str.extract("(\\w+://[^/]+)")
+
+        return df.groupby("url").agg(
+            first_seen=pd.NamedAgg(column="timestamp", aggfunc="min"),
+            last_seen=pd.NamedAgg(column="timestamp", aggfunc="max"),
+        ).sort_values(by="first_seen")
+
+    def callback_full_url_summary(self):
+        df = self.df_exploits()
+        df["url"] = df["deobfuscated_payload"].str.extract("(\\w+://.*?)}")
+
+        return df.groupby("url").agg(
+            first_seen=pd.NamedAgg(column="timestamp", aggfunc="min"),
+            last_seen=pd.NamedAgg(column="timestamp", aggfunc="max"),
+        ).sort_values(by="first_seen")
