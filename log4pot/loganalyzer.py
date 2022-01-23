@@ -15,7 +15,7 @@ class LogParsingError(Exception):
     exception : Exception
 
     def __str__(self):
-        return (f"Log4Pot log parse error type {self.error_type} in log file '{self.logfile}' line {logline}: {str(self.exception)}")
+        return (f"Log4Pot log parse error type {self.error_type} in log file '{self.logfile}' line {self.logline}: {str(self.exception)}")
 
 @dataclass
 class LogAnalyzer:
