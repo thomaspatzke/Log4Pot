@@ -1,6 +1,7 @@
 # A honeypot for the Log4Shell vulnerability (CVE-2021-44228)
 
 import json
+import os
 import re
 import socket
 import ssl
@@ -251,6 +252,10 @@ if args.payloader:
     except ImportError as e:
         print("Payload analysis requested but no pycurl installed or libcurl not available!")
         sys.exit(2)
+    try:
+        os.mkdir(args.download_dir)
+    except FileExistsError:
+        pass
     payloader = Payloader(args.download_dir, download_container, args.download_timeout, s3log)
 else:
     payloader = None

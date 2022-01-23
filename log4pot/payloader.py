@@ -194,7 +194,10 @@ class Payloader:
         """Store file in file system and Azure blob storage and return target name, which is specified or calculated (SHA256 of content)."""
         if dest_name is None:
             dest_name = self.hash_file(f)
-        self.copy_to_download(f, dest_name)
+        try:
+            self.copy_to_download(f, dest_name)
+        except FileNotFoundError:
+            pass
         self.upload_file_to_azure_blob(f, dest_name)
         self.upload_file_to_s3(f, dest_name)
         return dest_name
