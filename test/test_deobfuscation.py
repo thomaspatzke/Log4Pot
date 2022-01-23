@@ -20,3 +20,6 @@ def test_obfusc_nested_unknown():
 
 def test_obfusc_jndi_mixed_case():
     assert deobfuscate("${j${k8s:k5:-ND}i${sd:k5:-:}ldap://foo/bar}") == "${jndi:ldap://foo/bar}"
+    
+def test_obfusc_date_single_quote():
+    assert deobfuscate("${${upper:j}${lower:n}${lower:d}${upper:i}${date:':'}${lower:l}${lower:d}${date:'a'}${test:by:d2lab:-p}${lower::}${date:'/'}${date:'/'}foo/bar}") == "${jndi:ldap://127.0.0.1/test}"

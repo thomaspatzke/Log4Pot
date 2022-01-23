@@ -32,6 +32,8 @@ def deobfuscate(expr : str) -> str:
                 return "${jndi" + expr[6:]
             elif lookup_type in ("lower", "upper"):    # lower/upper case lookups
                 return expr[pos_colon + 1:pos_end].__getattribute__(lookup_type)() + deobfuscate(expr[pos_end + 1:])
+            elif lookup_type == 'date':
+                return expr[pos_colon + 1:pos_end].replace("'", "") + deobfuscate(expr[pos_end + 1:])
             elif pos_value is not None and pos_value < pos_end:       # ${...:-value} - return value
                 return expr[pos_value:pos_end] + deobfuscate(expr[pos_end + 1:])
             else:       # everything else: return value after colon, e.g. ${env:foo} -> foo
