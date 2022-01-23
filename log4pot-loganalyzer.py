@@ -56,7 +56,7 @@ print(f"Loaded {loganalyzer.event_count()} events")
 if "all" in summaries or "exploits" in summaries:
     df_payload_summary = loganalyzer.exploit_summary()
     df_payload_summary.reset_index().to_csv(
-        args.output / "epxloit_summary.csv",
+        args.output / "exploit_summary.csv",
         columns=("first_seen", "last_seen", "payload"),
         index=False,
         **default_csv_param,
