@@ -1,5 +1,6 @@
 import base64
 import binascii
+from multiprocessing.sharedctypes import Value
 import re
 import shutil
 from tempfile import TemporaryFile
@@ -16,6 +17,7 @@ re_urls = [     # Regular expressions for extraction of URLs from payloads and d
 ]
 re_url_exclusion = re.compile("(?:github|google|gstatic|upx)")
 re_base64_cmd = re.compile('Command/Base64/([a-zA-Z0-9+/]+={0,3})')
+re_obfusc_charcode = re.compile(b"fromCharCode\(([\d,\s]+)\)")
 
 @dataclass
 class Payloader:
@@ -128,11 +130,25 @@ class Payloader:
 
     def extract_urls_from_payload(self, payload : bytes) -> Set[str]:
         """Extract all URLs from a (binary) payload."""
-        return {
+        payloads = [ payload ]
+        try:
+            if (m := re_obfusc_charcode.search(payload)):
+                charcodes = str(m.group(1), encoding="iso-8859-1").replace(" ", "").split(",")
+                deobfuscated = "".join((
+                    chr(int(c))
+                    for c in charcodes
+                ))
+                payloads.append(bytes(deobfuscated, encoding="utf-8"))
+        except (ValueError, OverflowError):
+            pass
+
+        urls = {
                     str(url, "iso-8859-1")
+                    for p in payloads
                     for re_url in re_urls
-                    for url in re_url.findall(payload)
+                    for url in re_url.findall(p)
                 }
+        return urls
 
     def load_urls_recursively(self, urls : Set[str], visited_urls : Set[str] = set(), visit_limit : int = 10) -> Dict[str, str]:
         """
