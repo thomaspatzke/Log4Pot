@@ -8,6 +8,7 @@ License: [GPLv3.0](https://www.gnu.org/licenses/gpl-3.0.html)
 
 * Listen on various ports for Log4Shell exploitation.
 * Detect exploitation in request line and headers.
+* Download exploit payloads recursively.
 * Log to file and Azure blob storage.
 
 ## Usage
