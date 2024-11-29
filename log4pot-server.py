@@ -17,7 +17,7 @@ from uuid import uuid4
 from log4pot.expression_parser import parse as deobfuscate_old
 from log4pot.deobfuscator import deobfuscate as deobfuscate
 
-re_exploit = re.compile("\${.*}")
+re_exploit = re.compile("\\${.*}")
 
 @dataclass
 class Logger:
