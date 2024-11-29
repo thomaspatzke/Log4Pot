@@ -12,12 +12,12 @@ from dataclasses import dataclass
 import pycurl
 
 re_urls = [     # Regular expressions for extraction of URLs from payloads and downloaded samples.
-    re.compile(b'\w{3,5}://[^\x00-\x20;"\')\x7b-\xff]+'),                   # URLs prefixed with scheme and :// until first appearance of nonprintable or ending character.
-    re.compile(b'(?<=\s)\w+(?:\.\w+){2,}/[^\x00-\x20;"\')\x7b-\xff]+'),     # HTTP URLs without scheme. Preceded by whitespace followed by IP/domain name with at least two dots and continuing until first nonprintable or ending character appears.
+    re.compile(rb'\w{3,5}://[^\x00-\x20;"\')\x7b-\xff]+'),                   # URLs prefixed with scheme and :// until first appearance of nonprintable or ending character.
+    re.compile(rb'(?<=\s)\w+(?:\.\w+){2,}/[^\x00-\x20;"\')\x7b-\xff]+'),     # HTTP URLs without scheme. Preceded by whitespace followed by IP/domain name with at least two dots and continuing until first nonprintable or ending character appears.
 ]
 re_url_exclusion = re.compile("(?:github|google|gstatic|upx)")
 re_base64_cmd = re.compile('Command/Base64/([a-zA-Z0-9+/]+={0,3})')
-re_obfusc_charcode = re.compile(b"fromCharCode\(([\d,\s]+)\)")
+re_obfusc_charcode = re.compile(rb"fromCharCode\(([\d,\s]+)\)")
 
 @dataclass
 class Payloader:
