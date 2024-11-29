@@ -8,7 +8,7 @@ import ssl
 import sys
 from argparse import ArgumentParser
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
@@ -31,7 +31,7 @@ class Logger:
     def log(self, logtype: str, message: str, **kwargs):
         d = {
             "type": logtype,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             **kwargs,
         }
         j = json.dumps(d) + "\n"
